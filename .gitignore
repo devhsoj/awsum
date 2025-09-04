@@ -3,6 +3,7 @@
 
 # build stuff
 build/
+dist/
 
 # secret stuff
 .env
