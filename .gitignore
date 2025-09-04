@@ -1,0 +1,8 @@
+# ide stuff
+.idea/
+
+# build stuff
+build/
+
+# secret stuff
+.env
