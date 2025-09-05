@@ -41,8 +41,24 @@ func main() {
                     {
                         Name:        "list",
                         Description: "list EC2 instances",
+                        Flags: []cli.Flag{
+                            &cli.StringFlag{
+                                Name:     "format",
+                                Usage:    "pretty|csv",
+                                Value:    "pretty",
+                                OnlyOnce: true,
+                                Validator: func(s string) error {
+                                    if s != "pretty" && s != "csv" {
+                                        return fmt.Errorf("invalid format, must be pretty or csv")
+                                    }
+
+                                    return nil
+                                },
+                                ValidateDefaults: true,
+                            },
+                        },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.List(ctx, awsConfig)
+                            return commands.List(ctx, awsConfig, command.String("format"))
                         },
                     },
                 },

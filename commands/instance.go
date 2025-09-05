@@ -2,6 +2,7 @@ package commands
 
 import (
     "context"
+    "encoding/csv"
     "fmt"
     "os"
 
@@ -11,28 +12,64 @@ import (
     "github.com/olekukonko/tablewriter"
 )
 
-func List(ctx context.Context, awsConfig aws.Config) error {
+func List(ctx context.Context, awsConfig aws.Config, format string) error {
     instances, err := service.GetInstances(ctx, awsConfig)
 
     if err != nil {
         return err
     }
 
-    table := tablewriter.NewTable(os.Stdout)
+    if format == "csv" {
+        w := csv.NewWriter(os.Stdout)
 
-    table.Header("ID", "Name", "Type", "IP", "SSH Keypair")
-
-    for _, instance := range instances {
-        if err = table.Append(
-            util.Unwrap(instance.EC2.InstanceId),
-            instance.GetName(),
-            instance.GetType(),
-            instance.GetIpAddress(),
-            util.Unwrap(instance.EC2.KeyName),
-        ); err != nil {
-            return fmt.Errorf("failed to build instance list table: %w", err)
+        if err = w.Write([]string{
+            "ID",
+            "Name",
+            "Type",
+            "IP",
+            "Key",
+        }); err != nil {
+            return fmt.Errorf("failed to write instance header csv record: %w", err)
         }
+
+        for _, instance := range instances {
+            if err = w.Write([]string{
+                util.Unwrap(instance.EC2.InstanceId),
+                instance.GetName(),
+                instance.GetType(),
+                instance.GetIpAddress(),
+                util.Unwrap(instance.EC2.KeyName),
+            }); err != nil {
+                return fmt.Errorf("failed to write instance csv record: %w", err)
+            }
+        }
+
+        w.Flush()
+    } else if format == "pretty" {
+        table := tablewriter.NewWriter(os.Stdout)
+
+        table.Header([]string{
+            "ID",
+            "Name",
+            "Type",
+            "IP",
+            "Key",
+        })
+
+        for _, instance := range instances {
+            if err = table.Append([]string{
+                util.Unwrap(instance.EC2.InstanceId),
+                instance.GetName(),
+                instance.GetType(),
+                instance.GetIpAddress(),
+                util.Unwrap(instance.EC2.KeyName),
+            }); err != nil {
+                return fmt.Errorf("failed to build instance list table: %w", err)
+            }
+        }
+
+        return table.Render()
     }
 
-    return table.Render()
+    return nil
 }
