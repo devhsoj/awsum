@@ -4,6 +4,7 @@ import (
     "context"
     "fmt"
     "os"
+    "strings"
 
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/devhsoj/awsum/commands"
@@ -64,7 +65,7 @@ func main() {
                     },
                     {
                         Name:        "shell",
-                        Description: "open an SSH connection (with a shell) to an EC2 instance selected by filters",
+                        Description: "run a command or start a shell (via SSH) on EC2 instances matched by the given filters",
                         Flags: []cli.Flag{
                             &cli.StringFlag{
                                 Name:     "as",
@@ -79,8 +80,14 @@ func main() {
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.Shell(ctx, awsConfig, command.String("as"), service.InstanceFilters{
-                                Name: command.String("name"),
+                            return commands.StartShell(commands.StartShellOptions{
+                                Ctx:       ctx,
+                                AWSConfig: awsConfig,
+                                InstanceFilters: service.InstanceFilters{
+                                    Name: command.String("name"),
+                                },
+                                User:    command.String("as"),
+                                Command: strings.Join(command.Args().Slice(), " "),
                             })
                         },
                     },

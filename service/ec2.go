@@ -2,6 +2,7 @@ package service
 
 import (
     "context"
+    "errors"
     "fmt"
     "io"
     "os"
@@ -16,12 +17,7 @@ import (
 )
 
 type Instance struct {
-    EC2   types.Instance
-    valid bool
-}
-
-func (i Instance) IsValid() bool {
-    return i.valid
+    EC2 types.Instance
 }
 
 // GetFormattedBestIpAddress returns a string containing the 'best' ip address to display for the instance. By 'best',
@@ -119,11 +115,11 @@ func (i Instance) StartShell(user string) error {
     client, err := i.DialSSH(user)
 
     if err != nil {
-        return fmt.Errorf("failed to create ssh client while connecting instance: %w", err)
+        return fmt.Errorf("failed to create ssh client while connecting to instance: %w", err)
     }
 
     defer func() {
-        if err := client.Close(); err != nil {
+        if err := client.Close(); err != nil && !errors.Is(err, io.EOF) {
             fmt.Printf("failed to properly close ssh client connection to instance: %s\n", err)
         }
     }()
@@ -135,7 +131,7 @@ func (i Instance) StartShell(user string) error {
     }
 
     defer func() {
-        if err := session.Close(); err != nil {
+        if err := session.Close(); err != nil && !errors.Is(err, io.EOF) {
             fmt.Printf("failed to properly close ssh client session to instance: %s\n", err)
         }
     }()
@@ -159,10 +155,45 @@ func (i Instance) StartShell(user string) error {
     return nil
 }
 
+func (i Instance) RunCommand(user string, command string) error {
+    client, err := i.DialSSH(user)
+
+    if err != nil {
+        return fmt.Errorf("failed to create ssh client while connecting to instance: %w", err)
+    }
+
+    defer func() {
+        if err := client.Close(); err != nil && !errors.Is(err, io.EOF) {
+            fmt.Printf("failed to properly close ssh client connection to instance: %s\n", err)
+        }
+    }()
+
+    session, err := client.NewSession()
+
+    if err != nil {
+        return fmt.Errorf("failed to create ssh session while connecting to instance: %w", err)
+    }
+
+    defer func() {
+        if err := session.Close(); err != nil && !errors.Is(err, io.EOF) {
+            fmt.Printf("failed to properly close ssh client session to instance: %s\n", err)
+        }
+    }()
+
+    session.Stdout = os.Stdout
+    session.Stderr = os.Stderr
+    session.Stdin = os.Stdin
+
+    if err = session.Run(command); err != nil {
+        return fmt.Errorf("failed to run command on instance: %w", err)
+    }
+
+    return nil
+}
+
 func NewInstanceFromEC2(ec2Instance types.Instance) Instance {
     return Instance{
-        EC2:   ec2Instance,
-        valid: true,
+        EC2: ec2Instance,
     }
 }
 
@@ -172,7 +203,7 @@ type InstanceFilters struct {
 
 func (f InstanceFilters) DoesMatch(instance Instance) bool {
     if len(f.Name) > 0 {
-        if strings.Contains(strings.ToLower(instance.GetName()), f.Name) {
+        if strings.Contains(instance.GetName(), f.Name) {
             return true
         }
     }

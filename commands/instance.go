@@ -3,7 +3,6 @@ package commands
 import (
     "context"
     "encoding/csv"
-    "errors"
     "fmt"
     "os"
 
@@ -75,25 +74,32 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
     return nil
 }
 
-func Shell(ctx context.Context, awsConfig aws.Config, user string, filters service.InstanceFilters) error {
-    instances, err := service.GetInstances(ctx, awsConfig)
+type StartShellOptions struct {
+    Ctx             context.Context
+    AWSConfig       aws.Config
+    InstanceFilters service.InstanceFilters
+    User            string
+    Command         string
+}
+
+func StartShell(opts StartShellOptions) error {
+    instances, err := service.GetInstances(opts.Ctx, opts.AWSConfig)
 
     if err != nil {
         return err
     }
 
-    var selectedInstance service.Instance
-
     for _, instance := range instances {
-        if filters.DoesMatch(instance) {
-            selectedInstance = instance
-            break
+        if opts.InstanceFilters.DoesMatch(instance) {
+            if len(opts.Command) == 0 {
+                return instance.StartShell(opts.User)
+            }
+
+            if err = instance.RunCommand(opts.User, opts.Command); err != nil {
+                return err
+            }
         }
     }
 
-    if !selectedInstance.IsValid() {
-        return errors.New("failed to find an instance to start a shell based on the given filters")
-    }
-
-    return selectedInstance.StartShell(user)
+    return nil
 }
