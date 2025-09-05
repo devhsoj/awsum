@@ -7,6 +7,7 @@ import (
 
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/devhsoj/awsum/commands"
+    "github.com/devhsoj/awsum/service"
     "github.com/urfave/cli/v3"
 )
 
@@ -59,6 +60,28 @@ func main() {
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
                             return commands.List(ctx, awsConfig, command.String("format"))
+                        },
+                    },
+                    {
+                        Name:        "shell",
+                        Description: "open an SSH connection (with a shell) to an EC2 instance selected by filters",
+                        Flags: []cli.Flag{
+                            &cli.StringFlag{
+                                Name:     "as",
+                                Usage:    "which ssh user to connect as",
+                                Value:    "ec2-user",
+                                OnlyOnce: true,
+                            },
+                            &cli.StringFlag{
+                                Name:     "name",
+                                Usage:    "a fuzzy filter that matches against EC2 instance names (from tags)",
+                                OnlyOnce: true,
+                            },
+                        },
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.Shell(ctx, awsConfig, command.String("as"), service.InstanceFilters{
+                                Name: command.String("name"),
+                            })
                         },
                     },
                 },

@@ -3,6 +3,7 @@ package commands
 import (
     "context"
     "encoding/csv"
+    "errors"
     "fmt"
     "os"
 
@@ -36,8 +37,8 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
             if err = w.Write([]string{
                 util.Unwrap(instance.EC2.InstanceId),
                 instance.GetName(),
-                instance.GetType(),
-                instance.GetIpAddress(),
+                instance.GetFormattedType(),
+                instance.GetFormattedBestIpAddress(),
                 util.Unwrap(instance.EC2.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to write instance csv record: %w", err)
@@ -60,8 +61,8 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
             if err = table.Append([]string{
                 util.Unwrap(instance.EC2.InstanceId),
                 instance.GetName(),
-                instance.GetType(),
-                instance.GetIpAddress(),
+                instance.GetFormattedType(),
+                instance.GetFormattedBestIpAddress(),
                 util.Unwrap(instance.EC2.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to build instance list table: %w", err)
@@ -72,4 +73,27 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
     }
 
     return nil
+}
+
+func Shell(ctx context.Context, awsConfig aws.Config, user string, filters service.InstanceFilters) error {
+    instances, err := service.GetInstances(ctx, awsConfig)
+
+    if err != nil {
+        return err
+    }
+
+    var selectedInstance service.Instance
+
+    for _, instance := range instances {
+        if filters.DoesMatch(instance) {
+            selectedInstance = instance
+            break
+        }
+    }
+
+    if !selectedInstance.IsValid() {
+        return errors.New("failed to find an instance to start a shell based on the given filters")
+    }
+
+    return selectedInstance.StartShell(user)
 }
