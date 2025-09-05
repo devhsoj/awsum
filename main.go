@@ -6,6 +6,7 @@ import (
     "os"
 
     "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/devhsoj/awsum/commands"
     "github.com/urfave/cli/v3"
 )
 
@@ -21,14 +22,31 @@ func main() {
 
     cmd := &cli.Command{
         Name:        "awsum",
-        Description: "a fun tool for managing AWS infrastructure",
+        Description: "awsum is a fun CLI tool for managing AWS infrastructure at a high level",
         HideHelp:    true,
         Action: func(ctx context.Context, command *cli.Command) error {
-            fmt.Printf(
-                "(%s) run `awsum help` for a guide on how to use awsum!\n",
-                awsConfig.Region,
-            )
-            return nil
+            return commands.Intro(awsConfig)
+        },
+        Commands: []*cli.Command{
+            {
+                Name:        "help",
+                Description: "show helpful information about awsum and how it works",
+                Action: func(ctx context.Context, command *cli.Command) error {
+                    return commands.Help()
+                },
+            },
+            {
+                Name: "instance",
+                Commands: []*cli.Command{
+                    {
+                        Name:        "list",
+                        Description: "list EC2 instances",
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.List(ctx, awsConfig)
+                        },
+                    },
+                },
+            },
         },
     }
 
