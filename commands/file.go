@@ -35,7 +35,7 @@ func StoreFile(ctx context.Context, awsConfig aws.Config, filename string, prefi
         return err
     }
 
-    output, err := svc.PutObject(ctx, &s3.PutObjectInput{
+    _, err = svc.PutObject(ctx, &s3.PutObjectInput{
         Bucket: bucket.S3.Name,
         Key:    util.Pointer(path.Join(prefix, path.Base(filename))),
         ACL:    types.ObjectCannedACLPrivate,
@@ -45,8 +45,6 @@ func StoreFile(ctx context.Context, awsConfig aws.Config, filename string, prefi
     if err != nil {
         return fmt.Errorf("failed to put file object: %w", err)
     }
-
-    fmt.Printf("%db written\n", util.Unwrap(output.Size))
 
     return nil
 }
