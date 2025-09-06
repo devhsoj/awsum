@@ -77,3 +77,35 @@ func GetBucketByName(ctx context.Context, awsConfig aws.Config, name string) (*B
 
     return nil, ErrNoBucketMatchesName
 }
+
+func GetAllBucketObjects(ctx context.Context, awsConfig aws.Config, bucketName string) ([]types.Object, error) {
+    svc := s3.NewFromConfig(awsConfig)
+
+    var (
+        objects           []types.Object
+        continuationToken *string
+    )
+
+    for {
+        output, err := svc.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+            Bucket:            util.Pointer(bucketName),
+            ContinuationToken: continuationToken,
+        })
+
+        if err != nil {
+            return nil, fmt.Errorf("failed to get buckets: %w", err)
+        }
+
+        for _, object := range output.Contents {
+            objects = append(objects, object)
+        }
+
+        continuationToken = output.ContinuationToken
+
+        if continuationToken == nil {
+            break
+        }
+    }
+
+    return objects, nil
+}

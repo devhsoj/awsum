@@ -2,16 +2,19 @@ package commands
 
 import (
     "context"
+    "encoding/csv"
     "fmt"
     "io"
     "os"
     "path"
+    "time"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/service/s3"
     "github.com/aws/aws-sdk-go-v2/service/s3/types"
     "github.com/devhsoj/awsum/service"
     "github.com/devhsoj/awsum/util"
+    "github.com/olekukonko/tablewriter"
 )
 
 func StoreFile(ctx context.Context, awsConfig aws.Config, filename string, prefix string) error {
@@ -49,7 +52,7 @@ func StoreFile(ctx context.Context, awsConfig aws.Config, filename string, prefi
     return nil
 }
 
-func GetFile(ctx context.Context, awsConfig aws.Config, filename string, prefix string) error {
+func RetrieveFile(ctx context.Context, awsConfig aws.Config, filename string, prefix string) error {
     svc := s3.NewFromConfig(awsConfig)
 
     bucket, err := service.GetBucketByName(ctx, awsConfig, service.S3FileBucketName)
@@ -90,6 +93,60 @@ func DeleteFile(ctx context.Context, awsConfig aws.Config, filename string, pref
 
     if err != nil {
         return fmt.Errorf("failed to delete file s3 object: %w", err)
+    }
+
+    return nil
+}
+
+func ListFiles(ctx context.Context, config aws.Config, format string) error {
+    files, err := service.GetAllBucketObjects(ctx, config, service.S3FileBucketName)
+
+    if err != nil {
+        return fmt.Errorf("failed to get all files: %w", err)
+    }
+
+    if format == "csv" {
+        w := csv.NewWriter(os.Stdout)
+
+        if err = w.Write([]string{
+            "Name",
+            "Size",
+            "Last Modified",
+        }); err != nil {
+            return fmt.Errorf("failed to write file header csv record: %w", err)
+        }
+
+        for _, file := range files {
+            if err = w.Write([]string{
+                util.Unwrap(file.Key),
+                fmt.Sprintf("%.2f MiB", (float64(util.Unwrap(file.Size)))/1_024/1_024),
+                util.Unwrap(file.LastModified).In(time.Local).Format(time.RFC850),
+            }); err != nil {
+                return fmt.Errorf("failed to write file csv record: %w", err)
+            }
+        }
+
+        w.Flush()
+    } else if format == "pretty" {
+        table := tablewriter.NewWriter(os.Stdout)
+
+        table.Header([]string{
+            "Name",
+            "Size",
+            "Last Modified",
+        })
+
+        for _, file := range files {
+            if err = table.Append([]string{
+                util.Unwrap(file.Key),
+                fmt.Sprintf("%.2f MiB", (float64(util.Unwrap(file.Size)))/1_024/1_024),
+                util.Unwrap(file.LastModified).In(time.Local).Format(time.RFC850),
+            }); err != nil {
+                return fmt.Errorf("failed to build file list table: %w", err)
+            }
+        }
+
+        return table.Render()
     }
 
     return nil

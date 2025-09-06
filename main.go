@@ -98,26 +98,36 @@ func main() {
                 Commands: []*cli.Command{
                     {
                         Name: "store",
-                        Arguments: []cli.Argument{
-                            &cli.StringArg{
-                                Name:      "filename",
-                                UsageText: "The filename of the file to be stored. Absolute and relative paths are allowed.",
-                            },
-                            &cli.StringArg{
-                                Name:      "prefix",
-                                UsageText: "The S3 prefix to prepend to the filename for the resulting S3 object. Commonly used to represent directories.",
+                        Flags: []cli.Flag{
+                            &cli.StringFlag{
+                                Name: "prefix",
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.StoreFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                            prefix := command.String("prefix")
+
+                            for _, filename := range command.Args().Slice() {
+                                if err = commands.StoreFile(
+                                    ctx,
+                                    awsConfig,
+                                    filename,
+                                    prefix,
+                                ); err != nil {
+                                    return err
+                                }
+
+                                fmt.Printf("stored %s\n", filename)
+                            }
+
+                            return nil
                         },
                     },
                     {
-                        Name: "get",
+                        Name: "retrieve",
                         Arguments: []cli.Argument{
                             &cli.StringArg{
                                 Name:      "filename",
-                                UsageText: "The filename of the file to be stored. Absolute and relative paths are allowed.",
+                                UsageText: "The filename of the file to be retrieved. Absolute and relative paths are allowed.",
                             },
                             &cli.StringArg{
                                 Name:      "prefix",
@@ -125,7 +135,12 @@ func main() {
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.GetFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                            return commands.RetrieveFile(
+                                ctx,
+                                awsConfig,
+                                command.StringArg("filename"),
+                                command.StringArg("prefix"),
+                            )
                         },
                     },
                     {
@@ -142,6 +157,28 @@ func main() {
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
                             return commands.DeleteFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                        },
+                    },
+                    {
+                        Name: "list",
+                        Flags: []cli.Flag{
+                            &cli.StringFlag{
+                                Name:     "format",
+                                Usage:    "pretty|csv",
+                                Value:    "pretty",
+                                OnlyOnce: true,
+                                Validator: func(s string) error {
+                                    if s != "pretty" && s != "csv" {
+                                        return fmt.Errorf("invalid format, must be pretty or csv")
+                                    }
+
+                                    return nil
+                                },
+                                ValidateDefaults: true,
+                            },
+                        },
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.ListFiles(ctx, awsConfig, command.String("format"))
                         },
                     },
                 },
