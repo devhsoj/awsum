@@ -95,9 +95,13 @@ func StartShell(opts StartShellOptions) error {
                 return instance.StartShell(opts.User)
             }
 
+            fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
+
             if err = instance.RunCommand(opts.User, opts.Command); err != nil {
                 return err
             }
+
+            fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
         }
     }
 

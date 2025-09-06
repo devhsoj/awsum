@@ -230,7 +230,10 @@ func GetInstances(ctx context.Context, awsConfig aws.Config) ([]Instance, error)
 
         for _, reservation := range output.Reservations {
             for _, instance := range reservation.Instances {
-                instances = append(instances, NewInstanceFromEC2(instance))
+                // make sure the instance is absolutely running (16 is the instance state code for running)
+                if instance.State != nil && util.Unwrap(instance.State.Code) == 16 {
+                    instances = append(instances, NewInstanceFromEC2(instance))
+                }
             }
         }
 
