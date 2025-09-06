@@ -2,7 +2,9 @@ version: 2
 
 before:
   hooks:
+    - go test -run=. -bench=x ./...
     - go mod tidy
+    - go build -o build ./...
 
 builds:
   - env:

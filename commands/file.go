@@ -109,9 +109,9 @@ func ListFiles(ctx context.Context, config aws.Config, format string) error {
         w := csv.NewWriter(os.Stdout)
 
         if err = w.Write([]string{
-            "Name",
-            "Size",
-            "Last Modified",
+            "Filename",
+            "FileSizeInBytes",
+            "DateLastModifiedInSeconds",
         }); err != nil {
             return fmt.Errorf("failed to write file header csv record: %w", err)
         }
@@ -119,8 +119,8 @@ func ListFiles(ctx context.Context, config aws.Config, format string) error {
         for _, file := range files {
             if err = w.Write([]string{
                 util.Unwrap(file.Key),
-                fmt.Sprintf("%.2f MiB", (float64(util.Unwrap(file.Size)))/1_024/1_024),
-                util.Unwrap(file.LastModified).In(time.Local).Format(time.RFC850),
+                fmt.Sprintf("%d", util.Unwrap(file.Size)),
+                fmt.Sprintf("%d", util.Unwrap(file.LastModified).Unix()),
             }); err != nil {
                 return fmt.Errorf("failed to write file csv record: %w", err)
             }
@@ -133,7 +133,7 @@ func ListFiles(ctx context.Context, config aws.Config, format string) error {
         table.Header([]string{
             "Name",
             "Size",
-            "Last Modified",
+            "Date Last Modified",
         })
 
         for _, file := range files {
