@@ -93,6 +93,59 @@ func main() {
                     },
                 },
             },
+            {
+                Name: "file",
+                Commands: []*cli.Command{
+                    {
+                        Name: "store",
+                        Arguments: []cli.Argument{
+                            &cli.StringArg{
+                                Name:      "filename",
+                                UsageText: "The filename of the file to be stored. Absolute and relative paths are allowed.",
+                            },
+                            &cli.StringArg{
+                                Name:      "prefix",
+                                UsageText: "The S3 prefix to prepend to the filename for the resulting S3 object. Commonly used to represent directories.",
+                            },
+                        },
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.StoreFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                        },
+                    },
+                    {
+                        Name: "get",
+                        Arguments: []cli.Argument{
+                            &cli.StringArg{
+                                Name:      "filename",
+                                UsageText: "The filename of the file to be stored. Absolute and relative paths are allowed.",
+                            },
+                            &cli.StringArg{
+                                Name:      "prefix",
+                                UsageText: "The S3 prefix to prepend to the filename for the resulting S3 object. Commonly used to represent directories.",
+                            },
+                        },
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.GetFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                        },
+                    },
+                    {
+                        Name: "delete",
+                        Arguments: []cli.Argument{
+                            &cli.StringArg{
+                                Name:      "filename",
+                                UsageText: "The filename of the file s3 object.",
+                            },
+                            &cli.StringArg{
+                                Name:      "prefix",
+                                UsageText: "The S3 prefix to prepend to the filename for the resulting S3 object. Commonly used to represent directories.",
+                            },
+                        },
+                        Action: func(ctx context.Context, command *cli.Command) error {
+                            return commands.DeleteFile(ctx, awsConfig, command.StringArg("filename"), command.StringArg("prefix"))
+                        },
+                    },
+                },
+            },
         },
     }
 

@@ -17,12 +17,13 @@ import (
 )
 
 type Instance struct {
-    EC2 types.Instance
+    EC2       types.Instance
+    AWSConfig aws.Config
 }
 
 // GetFormattedBestIpAddress returns a string containing the 'best' ip address to display for the instance. By 'best',
 // meaning return the EC2 instance's public ip address if it is available, if not, return the private ip address.
-func (i Instance) GetFormattedBestIpAddress() string {
+func (i *Instance) GetFormattedBestIpAddress() string {
     var ip = util.Unwrap(i.EC2.PublicIpAddress)
 
     if len(ip) == 0 {
@@ -32,7 +33,7 @@ func (i Instance) GetFormattedBestIpAddress() string {
     return ip
 }
 
-func (i Instance) GetName() string {
+func (i *Instance) GetName() string {
     var name string
 
     for _, tag := range i.EC2.Tags {
@@ -45,13 +46,13 @@ func (i Instance) GetName() string {
     return name
 }
 
-func (i Instance) GetFormattedType() string {
+func (i *Instance) GetFormattedType() string {
     return fmt.Sprintf("%s (%s %s)", i.EC2.InstanceType, i.EC2.Architecture, util.Unwrap(i.EC2.PlatformDetails))
 }
 
 // GenerateSSHClientConfigFromAssumedUserKey generates an ssh client config with keys from the user's ssh directory.
 // Assumed to be '~/.ssh'. The given user will be used in authentication.
-func (i Instance) GenerateSSHClientConfigFromAssumedUserKey(user string) (*ssh.ClientConfig, error) {
+func (i *Instance) GenerateSSHClientConfigFromAssumedUserKey(user string) (*ssh.ClientConfig, error) {
     homeDir, err := os.UserHomeDir()
 
     if err != nil {
@@ -95,7 +96,7 @@ func (i Instance) GenerateSSHClientConfigFromAssumedUserKey(user string) (*ssh.C
     }, nil
 }
 
-func (i Instance) DialSSH(user string) (*ssh.Client, error) {
+func (i *Instance) DialSSH(user string) (*ssh.Client, error) {
     config, err := i.GenerateSSHClientConfigFromAssumedUserKey(user)
 
     if err != nil {
@@ -111,7 +112,7 @@ func (i Instance) DialSSH(user string) (*ssh.Client, error) {
     return client, nil
 }
 
-func (i Instance) StartShell(user string) error {
+func (i *Instance) StartShell(user string) error {
     client, err := i.DialSSH(user)
 
     if err != nil {
@@ -155,7 +156,7 @@ func (i Instance) StartShell(user string) error {
     return nil
 }
 
-func (i Instance) RunCommand(user string, command string) error {
+func (i *Instance) RunCommand(user string, command string) error {
     client, err := i.DialSSH(user)
 
     if err != nil {
@@ -191,9 +192,10 @@ func (i Instance) RunCommand(user string, command string) error {
     return nil
 }
 
-func NewInstanceFromEC2(ec2Instance types.Instance) Instance {
-    return Instance{
-        EC2: ec2Instance,
+func NewInstanceFromEC2(ec2Instance types.Instance, awsConfig aws.Config) *Instance {
+    return &Instance{
+        EC2:       ec2Instance,
+        AWSConfig: awsConfig,
     }
 }
 
@@ -201,7 +203,11 @@ type InstanceFilters struct {
     Name string
 }
 
-func (f InstanceFilters) DoesMatch(instance Instance) bool {
+func (f InstanceFilters) DoesMatch(instance *Instance) bool {
+    if instance == nil {
+        return false
+    }
+
     if len(f.Name) > 0 {
         if strings.Contains(instance.GetName(), f.Name) {
             return true
@@ -211,11 +217,11 @@ func (f InstanceFilters) DoesMatch(instance Instance) bool {
     return false
 }
 
-func GetInstances(ctx context.Context, awsConfig aws.Config) ([]Instance, error) {
+func GetInstances(ctx context.Context, awsConfig aws.Config) ([]*Instance, error) {
     svc := ec2.NewFromConfig(awsConfig)
 
     var (
-        instances []Instance
+        instances []*Instance
         nextToken *string
     )
 
@@ -232,7 +238,7 @@ func GetInstances(ctx context.Context, awsConfig aws.Config) ([]Instance, error)
             for _, instance := range reservation.Instances {
                 // make sure the instance is absolutely running (16 is the instance state code for running)
                 if instance.State != nil && util.Unwrap(instance.State.Code) == 16 {
-                    instances = append(instances, NewInstanceFromEC2(instance))
+                    instances = append(instances, NewInstanceFromEC2(instance, awsConfig))
                 }
             }
         }
