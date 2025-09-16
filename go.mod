@@ -10,6 +10,7 @@ require (
 	github.com/olekukonko/tablewriter v1.0.9
 	github.com/urfave/cli/v3 v3.4.1
 	golang.org/x/crypto v0.41.0
+	golang.org/x/term v0.34.0
 )
 
 require (

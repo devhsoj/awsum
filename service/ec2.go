@@ -14,6 +14,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/ec2/types"
     "github.com/devhsoj/awsum/util"
     "golang.org/x/crypto/ssh"
+    "golang.org/x/term"
 )
 
 type Instance struct {
@@ -112,8 +113,8 @@ func (i *Instance) DialSSH(user string) (*ssh.Client, error) {
     return client, nil
 }
 
-func (i *Instance) StartShell(user string) error {
-    client, err := i.DialSSH(user)
+func (i *Instance) AttachShell(sshUser string) error {
+    client, err := i.DialSSH(sshUser)
 
     if err != nil {
         return fmt.Errorf("failed to create ssh client while connecting to instance: %w", err)
@@ -141,7 +142,42 @@ func (i *Instance) StartShell(user string) error {
     session.Stderr = os.Stderr
     session.Stdin = os.Stdin
 
-    if err = session.RequestPty("xterm", 96, 24, ssh.TerminalModes{}); err != nil {
+    fd := int(os.Stdin.Fd())
+
+    oldState, err := term.MakeRaw(fd)
+
+    if err != nil {
+        return fmt.Errorf("failed to set terminal to raw mode while connecting to instance: %w", err)
+    }
+
+    defer func() {
+        if err := term.Restore(fd, oldState); err != nil {
+            fmt.Printf("failed to restore terminal state while connecting to instance: %s\n", err)
+        }
+    }()
+
+    width, height, err := term.GetSize(fd)
+
+    if err != nil {
+        return fmt.Errorf("failed to get local terminal size while connecting to instance: %w", err)
+    }
+
+    if err = session.RequestPty("xterm-256color", width, height, ssh.TerminalModes{
+        ssh.ECHO:          1,
+        ssh.TTY_OP_ISPEED: 14400,
+        ssh.TTY_OP_OSPEED: 14400,
+        ssh.IGNCR:         0,
+        ssh.ICRNL:         1,
+        ssh.OCRNL:         0,
+        ssh.ONLCR:         1,
+        ssh.ONLRET:        0,
+        ssh.INLCR:         0,
+        ssh.ECHONL:        0,
+        ssh.ICANON:        0,
+        ssh.ISIG:          0,
+        ssh.IEXTEN:        0,
+        ssh.ECHOCTL:       0,
+    }); err != nil {
         return fmt.Errorf("failed to request pty from instance: %w", err)
     }
 
@@ -156,8 +192,8 @@ func (i *Instance) StartShell(user string) error {
     return nil
 }
 
-func (i *Instance) RunCommand(user string, command string) error {
-    client, err := i.DialSSH(user)
+func (i *Instance) RunInteractiveCommand(sshUser string, command string) error {
+    client, err := i.DialSSH(sshUser)
 
     if err != nil {
         return fmt.Errorf("failed to create ssh client while connecting to instance: %w", err)

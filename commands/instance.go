@@ -92,12 +92,12 @@ func StartShell(opts StartShellOptions) error {
     for _, instance := range instances {
         if opts.InstanceFilters.DoesMatch(instance) {
             if len(opts.Command) == 0 {
-                return instance.StartShell(opts.User)
+                return instance.AttachShell(opts.User)
             }
 
             fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
 
-            if err = instance.RunCommand(opts.User, opts.Command); err != nil {
+            if err = instance.RunInteractiveCommand(opts.User, opts.Command); err != nil {
                 return err
             }
 
