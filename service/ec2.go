@@ -166,17 +166,7 @@ func (i *Instance) AttachShell(sshUser string) error {
         ssh.ECHO:          1,
         ssh.TTY_OP_ISPEED: 14400,
         ssh.TTY_OP_OSPEED: 14400,
-        ssh.IGNCR:         0,
-        ssh.ICRNL:         1,
-        ssh.OCRNL:         0,
-        ssh.ONLCR:         1,
-        ssh.ONLRET:        0,
-        ssh.INLCR:         0,
-        ssh.ECHONL:        0,
         ssh.ICANON:        0,
-        ssh.ISIG:          0,
-        ssh.IEXTEN:        0,
-        ssh.ECHOCTL:       0,
     }); err != nil {
         return fmt.Errorf("failed to request pty from instance: %w", err)
     }
