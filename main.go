@@ -60,7 +60,7 @@ func main() {
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.List(ctx, awsConfig, command.String("format"))
+                            return commands.InstanceList(ctx, awsConfig, command.String("format"))
                         },
                     },
                     {
@@ -81,7 +81,7 @@ func main() {
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.StartShell(commands.StartShellOptions{
+                            return commands.InstanceShell(commands.InstanceShellOptions{
                                 Ctx:       ctx,
                                 AWSConfig: awsConfig,
                                 InstanceFilters: service.InstanceFilters{
@@ -90,82 +90,6 @@ func main() {
                                 User:    command.String("user"),
                                 Command: strings.Join(command.Args().Slice(), " "),
                             })
-                        },
-                    },
-                },
-            },
-            {
-                Name: "file",
-                Commands: []*cli.Command{
-                    {
-                        Name: "store",
-                        Flags: []cli.Flag{
-                            &cli.StringFlag{
-                                Name:      "prefix",
-                                Usage:     "",
-                                Required:  false,
-                                Aliases:   []string{"p"},
-                                Validator: nil,
-                            },
-                        },
-                        Action: func(ctx context.Context, command *cli.Command) error {
-                            return commands.StoreFileItems(
-                                ctx,
-                                awsConfig,
-                                command.String("prefix"),
-                                command.Args().Slice()...,
-                            )
-                        },
-                    },
-                    {
-                        Name:    "retrieve",
-                        Aliases: []string{"get", "fetch"},
-                        Arguments: []cli.Argument{
-                            &cli.StringArg{
-                                Name:      "key",
-                                UsageText: "The key to match (which is the filename or directory path when files are stored from awsum) of the file s3 object(s) to be retrieved.",
-                            },
-                        },
-                        Action: func(ctx context.Context, command *cli.Command) error {
-                            return nil
-                        },
-                    },
-                    {
-                        Name: "delete",
-                        Arguments: []cli.Argument{
-                            &cli.StringArg{
-                                Name:      "filename",
-                                UsageText: "The filename of the file s3 object.",
-                            },
-                            &cli.StringArg{
-                                Name:      "prefix",
-                                UsageText: "The S3 prefix to prepend to the filename for the resulting S3 object. Commonly used to represent directories.",
-                            },
-                        },
-                        Action: func(ctx context.Context, command *cli.Command) error {
-                            return nil
-                        },
-                    },
-                    {
-                        Name: "list",
-                        Flags: []cli.Flag{
-                            &cli.StringFlag{
-                                Name:     "format",
-                                Usage:    "pretty|csv",
-                                Value:    "pretty",
-                                OnlyOnce: true,
-                                Validator: func(s string) error {
-                                    if s != "pretty" && s != "csv" {
-                                        return fmt.Errorf("invalid format, must be pretty or csv")
-                                    }
-
-                                    return nil
-                                },
-                                ValidateDefaults: true,
-                            },
-                        },
-                        Action: func(ctx context.Context, command *cli.Command) error {
-                            return nil
                         },
                     },
                 },

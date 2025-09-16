@@ -12,7 +12,7 @@ import (
     "github.com/olekukonko/tablewriter"
 )
 
-func List(ctx context.Context, awsConfig aws.Config, format string) error {
+func InstanceList(ctx context.Context, awsConfig aws.Config, format string) error {
     instances, err := service.GetRunningInstances(ctx, awsConfig)
 
     if err != nil {
@@ -74,7 +74,7 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
     return nil
 }
 
-type StartShellOptions struct {
+type InstanceShellOptions struct {
     Ctx             context.Context
     AWSConfig       aws.Config
     InstanceFilters service.InstanceFilters
@@ -82,7 +82,7 @@ type StartShellOptions struct {
     Command         string
 }
 
-func StartShell(opts StartShellOptions) error {
+func InstanceShell(opts InstanceShellOptions) error {
     instances, err := service.GetRunningInstances(opts.Ctx, opts.AWSConfig)
 
     if err != nil {
