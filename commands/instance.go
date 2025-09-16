@@ -7,13 +7,13 @@ import (
     "os"
 
     "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/devhsoj/awsum/internal/mem"
     "github.com/devhsoj/awsum/service"
-    "github.com/devhsoj/awsum/util"
     "github.com/olekukonko/tablewriter"
 )
 
 func List(ctx context.Context, awsConfig aws.Config, format string) error {
-    instances, err := service.GetInstances(ctx, awsConfig)
+    instances, err := service.GetRunningInstances(ctx, awsConfig)
 
     if err != nil {
         return err
@@ -34,11 +34,11 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
 
         for _, instance := range instances {
             if err = w.Write([]string{
-                util.Unwrap(instance.EC2.InstanceId),
+                mem.Unwrap(instance.EC2.InstanceId),
                 instance.GetName(),
                 instance.GetFormattedType(),
                 instance.GetFormattedBestIpAddress(),
-                util.Unwrap(instance.EC2.KeyName),
+                mem.Unwrap(instance.EC2.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to write instance csv record: %w", err)
             }
@@ -58,11 +58,11 @@ func List(ctx context.Context, awsConfig aws.Config, format string) error {
 
         for _, instance := range instances {
             if err = table.Append([]string{
-                util.Unwrap(instance.EC2.InstanceId),
+                mem.Unwrap(instance.EC2.InstanceId),
                 instance.GetName(),
                 instance.GetFormattedType(),
                 instance.GetFormattedBestIpAddress(),
-                util.Unwrap(instance.EC2.KeyName),
+                mem.Unwrap(instance.EC2.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to build instance list table: %w", err)
             }
@@ -83,7 +83,7 @@ type StartShellOptions struct {
 }
 
 func StartShell(opts StartShellOptions) error {
-    instances, err := service.GetInstances(opts.Ctx, opts.AWSConfig)
+    instances, err := service.GetRunningInstances(opts.Ctx, opts.AWSConfig)
 
     if err != nil {
         return err

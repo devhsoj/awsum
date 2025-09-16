@@ -12,8 +12,9 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/service/s3"
     "github.com/aws/aws-sdk-go-v2/service/s3/types"
+    "github.com/devhsoj/awsum/internal/mem"
     "github.com/devhsoj/awsum/service"
-    "github.com/devhsoj/awsum/util"
+
     "github.com/olekukonko/tablewriter"
 )
 
@@ -40,7 +41,7 @@ func StoreFile(ctx context.Context, awsConfig aws.Config, filename string, prefi
 
     _, err = svc.PutObject(ctx, &s3.PutObjectInput{
         Bucket: bucket.S3.Name,
-        Key:    util.Pointer(path.Join(prefix, path.Base(filename))),
+        Key:    mem.Pointer(path.Join(prefix, path.Base(filename))),
         ACL:    types.ObjectCannedACLPrivate,
         Body:   f,
     })
@@ -63,7 +64,7 @@ func RetrieveFile(ctx context.Context, awsConfig aws.Config, filename string, pr
 
     output, err := svc.GetObject(ctx, &s3.GetObjectInput{
         Bucket: bucket.S3.Name,
-        Key:    util.Pointer(path.Join(prefix, path.Base(filename))),
+        Key:    mem.Pointer(path.Join(prefix, path.Base(filename))),
     })
 
     if err != nil {
@@ -88,7 +89,7 @@ func DeleteFile(ctx context.Context, awsConfig aws.Config, filename string, pref
 
     _, err = svc.DeleteObject(ctx, &s3.DeleteObjectInput{
         Bucket: bucket.S3.Name,
-        Key:    util.Pointer(path.Join(prefix, path.Base(filename))),
+        Key:    mem.Pointer(path.Join(prefix, path.Base(filename))),
     })
 
     if err != nil {
@@ -118,9 +119,9 @@ func ListFiles(ctx context.Context, config aws.Config, format string) error {
 
         for _, file := range files {
             if err = w.Write([]string{
-                util.Unwrap(file.Key),
-                fmt.Sprintf("%d", util.Unwrap(file.Size)),
-                fmt.Sprintf("%d", util.Unwrap(file.LastModified).Unix()),
+                mem.Unwrap(file.Key),
+                fmt.Sprintf("%d", mem.Unwrap(file.Size)),
+                fmt.Sprintf("%d", mem.Unwrap(file.LastModified).Unix()),
             }); err != nil {
                 return fmt.Errorf("failed to write file csv record: %w", err)
             }
@@ -138,9 +139,9 @@ func ListFiles(ctx context.Context, config aws.Config, format string) error {
 
         for _, file := range files {
             if err = table.Append([]string{
-                util.Unwrap(file.Key),
-                fmt.Sprintf("%.2f MiB", (float64(util.Unwrap(file.Size)))/1_024/1_024),
-                util.Unwrap(file.LastModified).In(time.Local).Format(time.RFC850),
+                mem.Unwrap(file.Key),
+                fmt.Sprintf("%.2f MiB", (float64(mem.Unwrap(file.Size)))/1_024/1_024),
+                mem.Unwrap(file.LastModified).In(time.Local).Format(time.RFC850),
             }); err != nil {
                 return fmt.Errorf("failed to build file list table: %w", err)
             }

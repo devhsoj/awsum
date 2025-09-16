@@ -1,4 +1,4 @@
-package util
+package mem
 
 func Pointer[T any](v T) *T {
     return &v

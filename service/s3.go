@@ -8,7 +8,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/service/s3"
     "github.com/aws/aws-sdk-go-v2/service/s3/types"
-    "github.com/devhsoj/awsum/util"
+    "github.com/devhsoj/awsum/internal/mem"
 )
 
 const (
@@ -70,7 +70,7 @@ func GetBucketByName(ctx context.Context, awsConfig aws.Config, name string) (*B
     }
 
     for _, bucket := range buckets {
-        if util.Unwrap(bucket.S3.Name) == name {
+        if mem.Unwrap(bucket.S3.Name) == name {
             return bucket, nil
         }
     }
@@ -88,7 +88,7 @@ func GetAllBucketObjects(ctx context.Context, awsConfig aws.Config, bucketName s
 
     for {
         output, err := svc.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-            Bucket:            util.Pointer(bucketName),
+            Bucket:            mem.Pointer(bucketName),
             ContinuationToken: continuationToken,
         })
 
