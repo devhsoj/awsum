@@ -24,25 +24,18 @@ func main() {
 
     cmd := &cli.Command{
         Name:        "awsum",
-        Description: "awsum is a fun CLI tool for managing AWS infrastructure at a high level",
-        HideHelp:    true,
+        Usage:       "a fun CLI tool for working with AWS infra",
+        Description: "awsum allows you to rapidly develop with your own infra via the command line",
         Action: func(ctx context.Context, command *cli.Command) error {
             return commands.Intro(awsConfig)
         },
         Commands: []*cli.Command{
             {
-                Name:        "help",
-                Description: "show helpful information about awsum and how it works",
-                Action: func(ctx context.Context, command *cli.Command) error {
-                    return commands.Help()
-                },
-            },
-            {
                 Name: "instance",
                 Commands: []*cli.Command{
                     {
-                        Name:        "list",
-                        Description: "list EC2 instances",
+                        Name:  "list",
+                        Usage: "display a formatted list of EC2 instances",
                         Flags: []cli.Flag{
                             &cli.StringFlag{
                                 Name:     "format",
@@ -64,8 +57,9 @@ func main() {
                         },
                     },
                     {
-                        Name:        "shell",
-                        Description: "run a command or start a shell (via SSH) on EC2 instances matched by the given filters",
+                        Name:    "shell",
+                        Usage:   "run a command or start a shell (via SSH) on ec2 instance(s) matched by the given filters",
+                        Suggest: true,
                         Flags: []cli.Flag{
                             &cli.StringFlag{
                                 Name:     "user",
