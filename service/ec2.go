@@ -16,23 +16,136 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/ec2"
     "github.com/aws/aws-sdk-go-v2/service/ec2/types"
     "github.com/devhsoj/awsum/internal/files"
-    "github.com/devhsoj/awsum/internal/mem"
+    "github.com/devhsoj/awsum/internal/memory"
     "golang.org/x/crypto/ssh"
     "golang.org/x/term"
 )
 
+type EC2 struct {
+    client *ec2.Client
+}
+
+func (e *EC2) Client() *ec2.Client {
+    if e == nil || e.client == nil {
+        fmt.Printf("ec2 service not initialized!")
+        os.Exit(1)
+    }
+
+    return e.client
+}
+
+func (e *EC2) GetRunningInstances(ctx context.Context) ([]*Instance, error) {
+    var (
+        instances []*Instance
+        nextToken *string
+    )
+
+    for {
+        output, err := DefaultEC2.Client().DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+            NextToken: nextToken,
+        })
+
+        if err != nil {
+            return nil, fmt.Errorf("failed to get instances: %w", err)
+        }
+
+        for _, reservation := range output.Reservations {
+            for _, instance := range reservation.Instances {
+                // make sure the instance is absolutely running (16 is the instance state code for running)
+                if instance.State != nil && memory.Unwrap(instance.State.Code) == 16 {
+                    instances = append(instances, NewInstanceFromEC2(instance))
+                }
+            }
+        }
+
+        nextToken = output.NextToken
+
+        if nextToken == nil {
+            break
+        }
+    }
+
+    return instances, nil
+}
+
+func (e *EC2) GetVPCs(ctx context.Context) ([]types.Vpc, error) {
+    var (
+        vpcs      []types.Vpc
+        nextToken *string
+    )
+
+    for {
+        output, err := DefaultEC2.Client().DescribeVpcs(ctx, &ec2.DescribeVpcsInput{
+            NextToken: nextToken,
+        })
+
+        if err != nil {
+            return nil, fmt.Errorf("failed to get vpcs: %w", err)
+        }
+
+        for _, vpc := range output.Vpcs {
+            vpcs = append(vpcs, vpc)
+        }
+
+        nextToken = output.NextToken
+
+        if nextToken == nil {
+            break
+        }
+    }
+
+    return vpcs, nil
+}
+
+func (e *EC2) GetSubnets(ctx context.Context) ([]types.Subnet, error) {
+    var (
+        subnets   []types.Subnet
+        nextToken *string
+    )
+
+    for {
+        output, err := DefaultEC2.Client().DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+            NextToken: nextToken,
+        })
+
+        if err != nil {
+            return nil, fmt.Errorf("failed to get subnets: %w", err)
+        }
+
+        for _, subnet := range output.Subnets {
+            subnets = append(subnets, subnet)
+        }
+
+        nextToken = output.NextToken
+
+        if nextToken == nil {
+            break
+        }
+    }
+
+    return subnets, nil
+}
+
+func NewEC2(awsConfig aws.Config) *EC2 {
+    return &EC2{
+        client: ec2.NewFromConfig(awsConfig),
+    }
+}
+
+var DefaultEC2 *EC2
+
 type Instance struct {
-    EC2       types.Instance
-    AWSConfig aws.Config
+    Info    types.Instance
+    Service *EC2
 }
 
 // GetFormattedBestIpAddress returns a string containing the 'best' ip address to display for the instance. By 'best',
 // meaning return the EC2 instance's public ip address if it is available, if not, return the private ip address.
 func (i *Instance) GetFormattedBestIpAddress() string {
-    var ip = mem.Unwrap(i.EC2.PublicIpAddress)
+    var ip = memory.Unwrap(i.Info.PublicIpAddress)
 
     if len(ip) == 0 {
-        ip = mem.Unwrap(i.EC2.PrivateIpAddress)
+        ip = memory.Unwrap(i.Info.PrivateIpAddress)
     }
 
     return ip
@@ -41,9 +154,9 @@ func (i *Instance) GetFormattedBestIpAddress() string {
 func (i *Instance) GetName() string {
     var name string
 
-    for _, tag := range i.EC2.Tags {
-        if mem.Unwrap(tag.Key) == "Name" {
-            name = mem.Unwrap(tag.Value)
+    for _, tag := range i.Info.Tags {
+        if memory.Unwrap(tag.Key) == "Name" {
+            name = memory.Unwrap(tag.Value)
             break
         }
     }
@@ -52,7 +165,7 @@ func (i *Instance) GetName() string {
 }
 
 func (i *Instance) GetFormattedType() string {
-    return fmt.Sprintf("%s (%s %s)", i.EC2.InstanceType, i.EC2.Architecture, mem.Unwrap(i.EC2.PlatformDetails))
+    return fmt.Sprintf("%s (%s %s)", i.Info.InstanceType, i.Info.Architecture, memory.Unwrap(i.Info.PlatformDetails))
 }
 
 // GenerateSSHClientConfigFromAssumedUserKey generates an ssh client config with keys from the user's ssh directory.
@@ -65,7 +178,7 @@ func (i *Instance) GenerateSSHClientConfigFromAssumedUserKey(user string) (*ssh.
     }
 
     assumedSSHDirName := path.Join(homeDir, ".ssh")
-    assumedKeyFilename := path.Join(assumedSSHDirName, fmt.Sprintf("%s.pem", mem.Unwrap(i.EC2.KeyName)))
+    assumedKeyFilename := path.Join(assumedSSHDirName, fmt.Sprintf("%s.pem", memory.Unwrap(i.Info.KeyName)))
 
     privateKeyBuf, err := files.ReadFileFull(assumedKeyFilename)
 
@@ -98,7 +211,7 @@ func (i *Instance) DialSSH(user string) (*ssh.Client, error) {
         return nil, fmt.Errorf("failed to dial ssh: %w", err)
     }
 
-    client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", mem.Unwrap(i.EC2.PublicDnsName)), config)
+    client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", memory.Unwrap(i.Info.PublicDnsName)), config)
 
     if err != nil {
         return nil, fmt.Errorf("failed to start ssh connection: %w", err)
@@ -242,10 +355,10 @@ func (i *Instance) RunInteractiveCommand(sshUser string, command string) error {
     return nil
 }
 
-func NewInstanceFromEC2(ec2Instance types.Instance, awsConfig aws.Config) *Instance {
+func NewInstanceFromEC2(ec2Instance types.Instance) *Instance {
     return &Instance{
-        EC2:       ec2Instance,
-        AWSConfig: awsConfig,
+        Info:    ec2Instance,
+        Service: DefaultEC2,
     }
 }
 
@@ -267,38 +380,14 @@ func (f InstanceFilters) DoesMatch(instance *Instance) bool {
     return false
 }
 
-func GetRunningInstances(ctx context.Context, awsConfig aws.Config) ([]*Instance, error) {
-    svc := ec2.NewFromConfig(awsConfig)
+func (f InstanceFilters) Matches(instances []*Instance) []*Instance {
+    var matches []*Instance
 
-    var (
-        instances []*Instance
-        nextToken *string
-    )
-
-    for {
-        output, err := svc.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
-            NextToken: nextToken,
-        })
-
-        if err != nil {
-            return nil, fmt.Errorf("failed to get instances: %w", err)
-        }
-
-        for _, reservation := range output.Reservations {
-            for _, instance := range reservation.Instances {
-                // make sure the instance is absolutely running (16 is the instance state code for running)
-                if instance.State != nil && mem.Unwrap(instance.State.Code) == 16 {
-                    instances = append(instances, NewInstanceFromEC2(instance, awsConfig))
-                }
-            }
-        }
-
-        nextToken = output.NextToken
-
-        if nextToken == nil {
-            break
+    for _, instance := range instances {
+        if f.DoesMatch(instance) {
+            matches = append(matches, instance)
         }
     }
 
-    return instances, nil
+    return matches
 }

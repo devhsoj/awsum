@@ -6,14 +6,13 @@ import (
     "fmt"
     "os"
 
-    "github.com/aws/aws-sdk-go-v2/aws"
-    "github.com/devhsoj/awsum/internal/mem"
+    "github.com/devhsoj/awsum/internal/memory"
     "github.com/devhsoj/awsum/service"
     "github.com/olekukonko/tablewriter"
 )
 
-func InstanceList(ctx context.Context, awsConfig aws.Config, format string) error {
-    instances, err := service.GetRunningInstances(ctx, awsConfig)
+func InstanceList(ctx context.Context, format string) error {
+    instances, err := service.DefaultEC2.GetRunningInstances(ctx)
 
     if err != nil {
         return err
@@ -34,11 +33,11 @@ func InstanceList(ctx context.Context, awsConfig aws.Config, format string) erro
 
         for _, instance := range instances {
             if err = w.Write([]string{
-                mem.Unwrap(instance.EC2.InstanceId),
+                memory.Unwrap(instance.Info.InstanceId),
                 instance.GetName(),
                 instance.GetFormattedType(),
                 instance.GetFormattedBestIpAddress(),
-                mem.Unwrap(instance.EC2.KeyName),
+                memory.Unwrap(instance.Info.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to write instance csv record: %w", err)
             }
@@ -58,11 +57,11 @@ func InstanceList(ctx context.Context, awsConfig aws.Config, format string) erro
 
         for _, instance := range instances {
             if err = table.Append([]string{
-                mem.Unwrap(instance.EC2.InstanceId),
+                memory.Unwrap(instance.Info.InstanceId),
                 instance.GetName(),
                 instance.GetFormattedType(),
                 instance.GetFormattedBestIpAddress(),
-                mem.Unwrap(instance.EC2.KeyName),
+                memory.Unwrap(instance.Info.KeyName),
             }); err != nil {
                 return fmt.Errorf("failed to build instance list table: %w", err)
             }
@@ -76,33 +75,51 @@ func InstanceList(ctx context.Context, awsConfig aws.Config, format string) erro
 
 type InstanceShellOptions struct {
     Ctx             context.Context
-    AWSConfig       aws.Config
     InstanceFilters service.InstanceFilters
     User            string
     Command         string
 }
 
 func InstanceShell(opts InstanceShellOptions) error {
-    instances, err := service.GetRunningInstances(opts.Ctx, opts.AWSConfig)
+    instances, err := service.DefaultEC2.GetRunningInstances(opts.Ctx)
 
     if err != nil {
         return err
     }
 
-    for _, instance := range instances {
-        if opts.InstanceFilters.DoesMatch(instance) {
-            if len(opts.Command) == 0 {
-                return instance.AttachShell(opts.User)
-            }
-
-            fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
-
-            if err = instance.RunInteractiveCommand(opts.User, opts.Command); err != nil {
-                return err
-            }
-
-            fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+    for _, instance := range opts.InstanceFilters.Matches(instances) {
+        if len(opts.Command) == 0 {
+            return instance.AttachShell(opts.User)
         }
+
+        fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
+
+        if err = instance.RunInteractiveCommand(opts.User, opts.Command); err != nil {
+            return err
+        }
+
+        fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+    }
+
+    return nil
+}
+
+type InstanceLoadBalanceOptions struct {
+    Ctx             context.Context
+    ServiceName     string
+    InstanceFilters service.InstanceFilters
+    TrafficPort     uint16
+}
+
+func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
+    instances, err := service.DefaultEC2.GetRunningInstances(opts.Ctx)
+
+    if err != nil {
+        return err
+    }
+
+    for _, instance := range opts.InstanceFilters.Matches(instances) {
+        fmt.Println(instance)
     }
 
     return nil
