@@ -170,18 +170,6 @@ func (i *Instance) AttachShell(sshUser string) error {
         }
     }
 
-    resize := make(chan os.Signal, 1)
-
-    signal.Notify(resize, syscall.SIGWINCH)
-
-    go func() {
-        for range resize {
-            if width, height, err = term.GetSize(fd); err == nil {
-                _ = session.WindowChange(height, width)
-            }
-        }
-    }()
-
     quitSignals := make(chan os.Signal, 1)
     signal.Notify(quitSignals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
