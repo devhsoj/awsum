@@ -40,8 +40,6 @@ aws_secret_access_key = YOUR_AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
 
 These commands create a basic configuration for your awsum **and** potential future awscli installations.
 
----
-
 ## Usage
 
 To get a description of awsum and how to use its commands and sub-commands:
