@@ -1,7 +1,5 @@
 # awsum
 
----
-
 a fun (cross-platform) CLI tool for working with AWS infra
 
 ## Getting Started
@@ -41,6 +39,8 @@ aws_secret_access_key = YOUR_AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
 ```
 
 These commands create a basic configuration for your awsum **and** potential future awscli installations.
+
+---
 
 ## Usage
 
