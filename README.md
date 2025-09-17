@@ -47,13 +47,9 @@ To get a description of awsum and how to use its commands and sub-commands:
 awsum help
 ```
 
-**(Examples)** To get help with commands and sub-commands:
+**(Example)** To get help with commands and sub-commands:
 ```shell
-awsum instance help
-```
-
-```shell
-awsum instance shell --help
+awsum instance
 ```
 
 ### Real-World Examples
