@@ -85,7 +85,7 @@ func main() {
                         Flags: []cli.Flag{
                             &cli.StringFlag{
                                 Name:     "service",
-                                Usage:    "the name of the service you new or existing service you wish to load-balance",
+                                Usage:    "the name of the new or existing service you wish to load-balance",
                                 OnlyOnce: true,
                                 Required: true,
                             },
