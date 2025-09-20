@@ -59,12 +59,33 @@ Get a list of all instances
 awsum instance list --format csv
 ```
 
-Get the free disk space of every ec2 instance with a name matching "website" (we are assuming every instance is linux in this case):
+Get the free disk space of every ec2 instance with a name matching "website" (assuming nix-like system):
 ```shell
 awsum instance shell --name website "df -h"
 ```
 
-Run a ping test to CloudFlare's DNS service on all instances matching the name "api-server":
+Basic app deployment w/ load-balancing (Amazon Linux):
 ```shell
-awsum instance shell --name "api-server" "ping 1.1.1.1 -c 3"
+#!/bin/bash
+
+instance_name_filter=$1
+
+if [[ -z $instance_name_filter ]] then
+	echo "usage: $0 [INSTANCE NAME FILTER]"
+	exit 1
+fi
+
+# basic deployment
+
+awsum instance shell --name "$instance_name_filter" "sudo yum install docker -y"
+awsum instance shell --name "$instance_name_filter" "sudo service docker start"
+awsum instance shell --name "$instance_name_filter" "sudo usermod -aG docker ec2-user"
+awsum instance shell --name "$instance_name_filter" "docker rm nginx --force"
+awsum instance shell --name "$instance_name_filter" "docker run -d -p 80:80 --name nginx nginxdemos/hello"
+
+# load balancing
+
+awsum instance load-balance --service "nginx-demo" --name "$instance_name_filter" --port 80 --protocol http
 ```
+
+awsum really shines when used in CI/CD processes.
