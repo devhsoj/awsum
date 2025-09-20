@@ -25,16 +25,16 @@ type EC2 struct {
     client *ec2.Client
 }
 
-func (e *EC2) Client() *ec2.Client {
-    if e == nil || e.client == nil {
+func (svc *EC2) Client() *ec2.Client {
+    if svc == nil || svc.client == nil {
         fmt.Printf("ec2 service not initialized!")
         os.Exit(1)
     }
 
-    return e.client
+    return svc.client
 }
 
-func (e *EC2) GetRunningInstances(ctx context.Context) ([]*Instance, error) {
+func (svc *EC2) GetAllRunningInstances(ctx context.Context) ([]*Instance, error) {
     var (
         instances []*Instance
         nextToken *string
@@ -68,7 +68,7 @@ func (e *EC2) GetRunningInstances(ctx context.Context) ([]*Instance, error) {
     return instances, nil
 }
 
-func (e *EC2) GetVPCs(ctx context.Context) ([]types.Vpc, error) {
+func (svc *EC2) GetAllVPCs(ctx context.Context) ([]types.Vpc, error) {
     var (
         vpcs      []types.Vpc
         nextToken *string
@@ -83,10 +83,7 @@ func (e *EC2) GetVPCs(ctx context.Context) ([]types.Vpc, error) {
             return nil, fmt.Errorf("failed to get vpcs: %w", err)
         }
 
-        for _, vpc := range output.Vpcs {
-            vpcs = append(vpcs, vpc)
-        }
-
+        vpcs = append(vpcs, output.Vpcs...)
         nextToken = output.NextToken
 
         if nextToken == nil {
@@ -97,7 +94,7 @@ func (e *EC2) GetVPCs(ctx context.Context) ([]types.Vpc, error) {
     return vpcs, nil
 }
 
-func (e *EC2) GetSubnets(ctx context.Context) ([]types.Subnet, error) {
+func (svc *EC2) GetAllSubnets(ctx context.Context) ([]types.Subnet, error) {
     var (
         subnets   []types.Subnet
         nextToken *string
@@ -112,10 +109,7 @@ func (e *EC2) GetSubnets(ctx context.Context) ([]types.Subnet, error) {
             return nil, fmt.Errorf("failed to get subnets: %w", err)
         }
 
-        for _, subnet := range output.Subnets {
-            subnets = append(subnets, subnet)
-        }
-
+        subnets = append(subnets, output.Subnets...)
         nextToken = output.NextToken
 
         if nextToken == nil {
@@ -126,13 +120,15 @@ func (e *EC2) GetSubnets(ctx context.Context) ([]types.Subnet, error) {
     return subnets, nil
 }
 
-func (e *EC2) GetSecurityGroupByName(ctx context.Context, name string) (*types.SecurityGroup, error) {
+// SearchForSecurityGroupByName will return a security group matching the name given, if there are no matches then it will
+// return a nil pointer and a nil error.
+func (svc *EC2) SearchForSecurityGroupByName(ctx context.Context, name string) (*types.SecurityGroup, error) {
     var (
         nextToken *string
     )
 
     for {
-        sgOutput, err := e.Client().DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+        sgOutput, err := svc.Client().DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
             GroupNames: []string{name},
             NextToken:  nextToken,
         })
@@ -161,8 +157,8 @@ func (e *EC2) GetSecurityGroupByName(ctx context.Context, name string) (*types.S
     return nil, nil
 }
 
-func (e *EC2) CreateSecurityGroup(ctx context.Context, name string) (*ec2.CreateSecurityGroupOutput, error) {
-    return e.Client().CreateSecurityGroup(ctx, &ec2.CreateSecurityGroupInput{
+func (svc *EC2) CreateEmptySecurityGroup(ctx context.Context, name string) (*ec2.CreateSecurityGroupOutput, error) {
+    return svc.Client().CreateSecurityGroup(ctx, &ec2.CreateSecurityGroupInput{
         GroupName:   memory.Pointer(name),
         Description: memory.Pointer("managed by awsum"),
         TagSpecifications: []types.TagSpecification{

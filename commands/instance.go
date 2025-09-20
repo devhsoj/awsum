@@ -3,11 +3,8 @@ package commands
 import (
     "context"
     "encoding/csv"
-    "errors"
     "fmt"
-    "maps"
     "os"
-    "slices"
 
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
     "github.com/devhsoj/awsum/internal/memory"
@@ -16,7 +13,7 @@ import (
 )
 
 func InstanceList(ctx context.Context, format string) error {
-    instances, err := service.DefaultEC2.GetRunningInstances(ctx)
+    instances, err := service.DefaultEC2.GetAllRunningInstances(ctx)
 
     if err != nil {
         return err
@@ -85,7 +82,7 @@ type InstanceShellOptions struct {
 }
 
 func InstanceShell(opts InstanceShellOptions) error {
-    instances, err := service.DefaultEC2.GetRunningInstances(opts.Ctx)
+    instances, err := service.DefaultEC2.GetAllRunningInstances(opts.Ctx)
 
     if err != nil {
         return err
@@ -118,53 +115,12 @@ type InstanceLoadBalanceOptions struct {
 }
 
 func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
-    instances, err := service.DefaultEC2.GetRunningInstances(opts.Ctx)
-
-    if err != nil {
-        return err
-    }
-
-    matches := opts.InstanceFilters.Matches(instances)
-
-    if len(matches) == 0 {
-        return nil
-    }
-
-    var (
-        vpcs    = make(map[string]struct{})
-        subnets = make(map[string]struct{})
-    )
-
-    for _, instance := range matches {
-        vpcs[memory.Unwrap(instance.Info.VpcId)] = struct{}{}
-        subnets[memory.Unwrap(instance.Info.SubnetId)] = struct{}{}
-    }
-
-    matchedVPCs := slices.Collect(maps.Keys(vpcs))
-
-    if len(matchedVPCs) > 1 {
-        return errors.New("desired instances must all be in the same vpc")
-    }
-
-    requiredSubnets := slices.Collect(maps.Keys(subnets))
-
-    resources, err := service.DefaultELBv2.SetupInstanceServiceLoadBalanceResources(service.ELBv2SetupInstanceTargetGroupOptions{
-        Ctx:             opts.Ctx,
-        VpcId:           matchedVPCs[0],
-        SubnetIds:       requiredSubnets,
-        ServiceName:     opts.ServiceName,
-        Instances:       matches,
-        TrafficPort:     opts.TrafficPort,
-        TrafficProtocol: opts.TrafficProtocol,
-        IpProtocol:      opts.IpProtocol,
-        EC2:             service.DefaultEC2,
+    return service.DefaultAwsumILB.SetupNewILBService(service.SetupNewILBServiceOptions{
+        Ctx:                   opts.Ctx,
+        ServiceName:           opts.ServiceName,
+        TargetInstanceFilters: opts.InstanceFilters,
+        TrafficPort:           opts.TrafficPort,
+        TrafficProtocol:       opts.TrafficProtocol,
+        IpProtocol:            opts.IpProtocol,
     })
-
-    if err != nil {
-        return err
-    }
-
-    fmt.Printf("%s %s %s\n", resources.LoadBalancerArn, resources.TargetGroupArn, resources.SecurityGroupArn)
-
-    return nil
 }

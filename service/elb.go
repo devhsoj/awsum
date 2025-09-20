@@ -2,17 +2,11 @@ package service
 
 import (
     "context"
-    "errors"
     "fmt"
-    "log"
-    "maps"
     "os"
-    "slices"
     "strings"
 
     "github.com/aws/aws-sdk-go-v2/aws"
-    "github.com/aws/aws-sdk-go-v2/service/ec2"
-    ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
     elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
     "github.com/devhsoj/awsum/internal/memory"
@@ -22,90 +16,26 @@ type ELBv2 struct {
     client *elbv2.Client
 }
 
-func (e *ELBv2) Client() *elbv2.Client {
-    if e == nil || e.client == nil {
+func (svc *ELBv2) Client() *elbv2.Client {
+    if svc == nil || svc.client == nil {
         fmt.Printf("elbv2 service not initialized!")
         os.Exit(1)
     }
 
-    return e.client
+    return svc.client
 }
 
-func (e *ELBv2) GenerateAwsumServiceName(serviceName string) string {
+func (svc *ELBv2) GenerateAwsumServiceName(serviceName string) string {
     return fmt.Sprintf("awsum-service-%s", serviceName)
 }
 
-type ELBv2SetupInstanceTargetGroupOptions struct {
-    Ctx             context.Context
-    VpcId           string
-    SubnetIds       []string
-    ServiceName     string
-    Instances       []*Instance
-    TrafficPort     uint16
-    TrafficProtocol types.ProtocolEnum
-    IpProtocol      string
-    EC2             *EC2
-}
-
-type ELBv2SetupInstanceServiceLoadBalanceResources struct {
-    TargetGroupArn   string
-    LoadBalancerArn  string
-    SecurityGroupArn string
-}
-
-func (e *ELBv2) SetupInstanceServiceLoadBalanceResources(opts ELBv2SetupInstanceTargetGroupOptions) (*ELBv2SetupInstanceServiceLoadBalanceResources, error) {
-    var (
-        targetGroupArn  string
-        loadBalancerArn string
-        securityGroupId string
-    )
-
-    opts.ServiceName = e.GenerateAwsumServiceName(opts.ServiceName)
-
-    tgOutput, err := e.Client().DescribeTargetGroups(opts.Ctx, &elbv2.DescribeTargetGroupsInput{
-        Names: []string{opts.ServiceName},
-    })
-
-    if err != nil && !strings.Contains(err.Error(), "TargetGroupNotFound") {
-        return nil, err
-    }
-
-    if tgOutput == nil || len(tgOutput.TargetGroups) == 0 {
-        ctgOutput, err := e.Client().CreateTargetGroup(opts.Ctx, &elbv2.CreateTargetGroupInput{
-            Name:                    memory.Pointer(opts.ServiceName),
-            Port:                    memory.Pointer(int32(opts.TrafficPort)),
-            Protocol:                opts.TrafficProtocol,
-            VpcId:                   memory.Pointer(opts.VpcId),
-            TargetType:              types.TargetTypeEnumInstance,
-            HealthCheckPath:         memory.Pointer("/"),
-            HealthCheckProtocol:     types.ProtocolEnumHttp,
-            HealthCheckPort:         memory.Pointer("traffic-port"),
-            HealthyThresholdCount:   memory.Pointer(int32(3)),
-            UnhealthyThresholdCount: memory.Pointer(int32(3)),
-            Matcher:                 &types.Matcher{HttpCode: memory.Pointer("200,301,302,304")},
-        })
-
-        if err != nil {
-            return nil, err
-        }
-
-        if len(ctgOutput.TargetGroups) == 0 {
-            return nil, errors.New("target group not found after creation")
-        }
-
-        targetGroupArn = memory.Unwrap(ctgOutput.TargetGroups[0].TargetGroupArn)
-    }
-
-    if tgOutput != nil {
-        targetGroupArn = memory.Unwrap(tgOutput.TargetGroups[0].TargetGroupArn)
-    }
-
-    dthOutput, err := e.Client().DescribeTargetHealth(opts.Ctx, &elbv2.DescribeTargetHealthInput{
+func (svc *ELBv2) DeregisterAllTargetsInTargetGroup(ctx context.Context, targetGroupArn string) error {
+    dthOutput, err := svc.Client().DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{
         TargetGroupArn: memory.Pointer(targetGroupArn),
     })
 
     if err != nil {
-        return nil, err
+        return err
     }
 
     var targets []types.TargetDescription
@@ -118,159 +48,82 @@ func (e *ELBv2) SetupInstanceServiceLoadBalanceResources(opts ELBv2SetupInstance
         targets = append(targets, *desc.Target)
     }
 
+    // to prevent annoying client error
     if len(targets) > 0 {
-        _, err = e.Client().DeregisterTargets(opts.Ctx, &elbv2.DeregisterTargetsInput{
+        _, err = svc.Client().DeregisterTargets(ctx, &elbv2.DeregisterTargetsInput{
             TargetGroupArn: memory.Pointer(targetGroupArn),
             Targets:        targets,
         })
-
-        if err != nil {
-            return nil, err
-        }
     }
 
-    for _, instance := range opts.Instances {
-        _, err = e.Client().RegisterTargets(opts.Ctx, &elbv2.RegisterTargetsInput{
-            TargetGroupArn: memory.Pointer(targetGroupArn),
-            Targets: []types.TargetDescription{
-                {Id: instance.Info.InstanceId, Port: memory.Pointer(int32(opts.TrafficPort))},
-            },
+    return err
+}
+
+func (svc *ELBv2) GetAllListenersInLoadBalancer(ctx context.Context, loadBalancerArn string) ([]types.Listener, error) {
+    var (
+        dlOutput  *elbv2.DescribeListenersOutput
+        arn       = memory.Pointer(loadBalancerArn)
+        listeners []types.Listener
+        marker    *string
+        err       error
+    )
+
+    for {
+        dlOutput, err = svc.Client().DescribeListeners(ctx, &elbv2.DescribeListenersInput{
+            LoadBalancerArn: arn,
+            Marker:          marker,
+            PageSize:        nil,
         })
 
         if err != nil {
-            log.Printf("register target error: %+v\n", err)
             return nil, err
+        }
+
+        listeners = append(listeners, dlOutput.Listeners...)
+        marker = dlOutput.NextMarker
+
+        if marker == nil {
+            break
         }
     }
 
-    sg, err := opts.EC2.GetSecurityGroupByName(opts.Ctx, opts.ServiceName)
+    return listeners, err
+}
+
+func (svc *ELBv2) DeleteAllListenersInLoadBalancer(ctx context.Context, loadBalancerArn string) error {
+    listeners, err := svc.GetAllListenersInLoadBalancer(ctx, loadBalancerArn)
 
     if err != nil {
-        return nil, err
+        return err
     }
 
-    if sg != nil {
-        securityGroupId = memory.Unwrap(sg.GroupId)
-    } else {
-        csgOutput, err := opts.EC2.CreateSecurityGroup(opts.Ctx, opts.ServiceName)
-
-        if err != nil {
-            return nil, err
-        }
-
-        securityGroupId = memory.Unwrap(csgOutput.GroupId)
-    }
-
-    _, err = opts.EC2.Client().AuthorizeSecurityGroupIngress(opts.Ctx, &ec2.AuthorizeSecurityGroupIngressInput{
-        GroupId: memory.Pointer(securityGroupId),
-        IpPermissions: []ec2Types.IpPermission{
-            {
-                FromPort:   memory.Pointer(int32(opts.TrafficPort)),
-                ToPort:     memory.Pointer(int32(opts.TrafficPort)),
-                IpProtocol: memory.Pointer(opts.IpProtocol),
-                IpRanges: []ec2Types.IpRange{
-                    {
-                        CidrIp:      memory.Pointer("0.0.0.0/0"),
-                        Description: memory.Pointer("all outbound"),
-                    },
-                },
-            },
-        },
-    })
-
-    if err != nil && !strings.Contains(err.Error(), "already exists") {
-        return nil, err
-    }
-
-    _, err = opts.EC2.Client().AuthorizeSecurityGroupEgress(opts.Ctx, &ec2.AuthorizeSecurityGroupEgressInput{
-        GroupId: memory.Pointer(securityGroupId),
-        IpPermissions: []ec2Types.IpPermission{
-            {
-                FromPort:   memory.Pointer(int32(opts.TrafficPort)),
-                ToPort:     memory.Pointer(int32(opts.TrafficPort)),
-                IpProtocol: memory.Pointer(opts.IpProtocol),
-                IpRanges: []ec2Types.IpRange{
-                    {
-                        CidrIp:      memory.Pointer("0.0.0.0/0"),
-                        Description: memory.Pointer("all outbound"),
-                    },
-                },
-            },
-        },
-    })
-
-    if err != nil && !strings.Contains(err.Error(), "already exists") {
-        return nil, err
-    }
-
-    dlbOutput, err := e.Client().DescribeLoadBalancers(opts.Ctx, &elbv2.DescribeLoadBalancersInput{
-        Names: []string{opts.ServiceName},
-    })
-
-    if err != nil && !strings.Contains(err.Error(), "LoadBalancerNotFound") {
-        return nil, err
-    }
-
-    if dlbOutput == nil || len(dlbOutput.LoadBalancers) == 0 {
-        subnets, err := opts.EC2.GetSubnets(opts.Ctx)
-
-        if err != nil {
-            return nil, err
-        }
-
-        var subnetIds = make(map[string]ec2Types.Subnet)
-
-        for _, subnet := range subnets {
-            if memory.Unwrap(subnet.VpcId) == opts.VpcId {
-                subnetIds[memory.Unwrap(subnet.SubnetId)] = subnet
-            }
-        }
-
-        clbOutput, err := e.Client().CreateLoadBalancer(opts.Ctx, &elbv2.CreateLoadBalancerInput{
-            Name:           memory.Pointer(opts.ServiceName),
-            Type:           types.LoadBalancerTypeEnumApplication,
-            Scheme:         types.LoadBalancerSchemeEnumInternetFacing,
-            SecurityGroups: []string{securityGroupId},
-            Subnets:        slices.Collect(maps.Keys(subnetIds)),
-            IpAddressType:  types.IpAddressTypeIpv4,
+    for _, listener := range listeners {
+        _, err = svc.Client().DeleteListener(ctx, &elbv2.DeleteListenerInput{
+            ListenerArn: listener.ListenerArn,
         })
 
         if err != nil {
-            return nil, err
+            return err
         }
-
-        if len(clbOutput.LoadBalancers) == 0 {
-            return nil, errors.New("load balancer not found after creation")
-        }
-
-        loadBalancerArn = memory.Unwrap(clbOutput.LoadBalancers[0].LoadBalancerArn)
     }
 
-    if dlbOutput != nil {
-        loadBalancerArn = memory.Unwrap(dlbOutput.LoadBalancers[0].LoadBalancerArn)
-    }
+    return nil
+}
 
-    _, err = e.Client().CreateListener(opts.Ctx, &elbv2.CreateListenerInput{
-        LoadBalancerArn: memory.Pointer(loadBalancerArn),
-        Port:            memory.Pointer(int32(opts.TrafficPort)),
-        Protocol:        opts.TrafficProtocol,
-        DefaultActions: []types.Action{{
-            Type: types.ActionTypeEnumForward,
-            ForwardConfig: &types.ForwardActionConfig{
-                TargetGroups: []types.TargetGroupTuple{
-                    {
-                        TargetGroupArn: memory.Pointer(targetGroupArn),
-                    },
-                },
-            },
-        }},
+func (svc *ELBv2) GetLoadBalancerByName(ctx context.Context, name string) (*types.LoadBalancer, error) {
+    dlbOutput, err := svc.Client().DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
+        Names: []string{name},
     })
 
-    return &ELBv2SetupInstanceServiceLoadBalanceResources{
-        TargetGroupArn:   targetGroupArn,
-        LoadBalancerArn:  loadBalancerArn,
-        SecurityGroupArn: securityGroupId,
-    }, err
+    if err != nil {
+        if strings.Contains(err.Error(), "LoadBalancerNotFound") {
+            return nil, nil
+        }
+
+        return nil, err
+    }
+
+    return &dlbOutput.LoadBalancers[0], nil
 }
 
 func NewELBv2(awsConfig aws.Config) *ELBv2 {
