@@ -23,6 +23,8 @@ go install github.com/levelshatter/awsum@latest
 
 ### Configuring
 
+awsum uses the same exact configuration the [awscli](https://aws.amazon.com/cli/) tool uses (since we use the client library already) to keep environments less messy.
+
 If you have [awscli](https://aws.amazon.com/cli/) installed & configured, you are already good to go!
 
 If not, then you can do the following:
