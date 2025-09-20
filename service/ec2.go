@@ -185,8 +185,6 @@ func NewEC2(awsConfig aws.Config) *EC2 {
     }
 }
 
-var DefaultEC2 *EC2
-
 type Instance struct {
     Info    types.Instance
     Service *EC2

@@ -278,5 +278,3 @@ func NewELBv2(awsConfig aws.Config) *ELBv2 {
         client: elbv2.NewFromConfig(awsConfig),
     }
 }
-
-var DefaultELBv2 *ELBv2
