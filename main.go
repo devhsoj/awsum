@@ -2,10 +2,13 @@ package main
 
 import (
     "context"
+    "errors"
     "fmt"
     "os"
+    "slices"
     "strings"
 
+    "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
     "github.com/devhsoj/awsum/commands"
     "github.com/devhsoj/awsum/internal/app"
     "github.com/devhsoj/awsum/service"
@@ -82,19 +85,40 @@ func main() {
                         Flags: []cli.Flag{
                             &cli.StringFlag{
                                 Name:     "service",
-                                Usage:    "the name of the service you wish to load-balance",
+                                Usage:    "the name of the service you new or existing service you wish to load-balance",
                                 OnlyOnce: true,
                                 Required: true,
                             },
                             &cli.StringFlag{
                                 Name:     "name",
-                                Usage:    "a fuzzy filter that matches against ec2 instance names (from tags)",
+                                Usage:    "a fuzzy filter that matches against ec2 instance names (from tags) to include in the load-balance resource creation",
                                 OnlyOnce: true,
                             },
                             &cli.Uint16Flag{
-                                Name:     "traffic-port",
-                                Usage:    "the traffic port to load-balance your service between your desired instances",
+                                Name:     "port",
+                                Usage:    "the traffic port of your service",
                                 Required: true,
+                            },
+                            &cli.StringFlag{
+                                Name:        "protocol",
+                                DefaultText: "http",
+                                Usage:       "the traffic protocol of your service",
+                                Required:    true,
+                                Value:       "http",
+                                Validator: func(s string) error {
+                                    if !slices.Contains(types.ProtocolEnum("").Values(), types.ProtocolEnum(strings.ToUpper(s))) {
+                                        return errors.New("invalid protocol")
+                                    }
+
+                                    return nil
+                                },
+                                ValidateDefaults: true,
+                            },
+                            &cli.StringFlag{
+                                Name:        "ip-protocol",
+                                DefaultText: "tcp",
+                                Usage:       "the underlying IP protocol for your service",
+                                Value:       "tcp",
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
@@ -104,7 +128,9 @@ func main() {
                                 InstanceFilters: service.InstanceFilters{
                                     Name: command.String("name"),
                                 },
-                                TrafficPort: command.Uint16("traffic-port"),
+                                TrafficPort:     command.Uint16("port"),
+                                TrafficProtocol: types.ProtocolEnum(strings.ToUpper(command.String("protocol"))),
+                                IpProtocol:      strings.ToLower(command.String("ip-protocol")),
                             })
                         },
                     },

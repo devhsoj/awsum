@@ -126,6 +126,59 @@ func (e *EC2) GetSubnets(ctx context.Context) ([]types.Subnet, error) {
     return subnets, nil
 }
 
+func (e *EC2) GetSecurityGroupByName(ctx context.Context, name string) (*types.SecurityGroup, error) {
+    var (
+        nextToken *string
+    )
+
+    for {
+        sgOutput, err := e.Client().DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+            GroupNames: []string{name},
+            NextToken:  nextToken,
+        })
+
+        if err != nil && !strings.Contains(err.Error(), "InvalidGroup.NotFound") {
+            return nil, err
+        }
+
+        if sgOutput == nil {
+            break
+        }
+
+        for _, securityGroup := range sgOutput.SecurityGroups {
+            if memory.Unwrap(securityGroup.GroupName) == name {
+                return &securityGroup, nil
+            }
+        }
+
+        nextToken = sgOutput.NextToken
+
+        if nextToken == nil {
+            break
+        }
+    }
+
+    return nil, nil
+}
+
+func (e *EC2) CreateSecurityGroup(ctx context.Context, name string) (*ec2.CreateSecurityGroupOutput, error) {
+    return e.Client().CreateSecurityGroup(ctx, &ec2.CreateSecurityGroupInput{
+        GroupName:   memory.Pointer(name),
+        Description: memory.Pointer("managed by awsum"),
+        TagSpecifications: []types.TagSpecification{
+            {
+                ResourceType: types.ResourceTypeSecurityGroup,
+                Tags: []types.Tag{
+                    {
+                        Key:   memory.Pointer("managed-by"),
+                        Value: memory.Pointer("awsum"),
+                    },
+                },
+            },
+        },
+    })
+}
+
 func NewEC2(awsConfig aws.Config) *EC2 {
     return &EC2{
         client: ec2.NewFromConfig(awsConfig),
