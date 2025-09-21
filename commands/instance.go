@@ -136,7 +136,7 @@ func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
         return err
     }
 
-    output := memory.Unwrap(resources.LoadBalancer.DNSName)
+    output := resources.LoadBalancerDNSName
 
     if len(opts.CertificateNames) > 0 {
         output = opts.CertificateNames[0]

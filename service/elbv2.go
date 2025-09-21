@@ -78,7 +78,6 @@ func (svc *ELBv2) GetAllListenersInLoadBalancer(ctx context.Context, loadBalance
         dlOutput, err = svc.Client().DescribeListeners(ctx, &elbv2.DescribeListenersInput{
             LoadBalancerArn: arn,
             Marker:          marker,
-            PageSize:        nil,
         })
 
         if err != nil {
@@ -116,7 +115,7 @@ func (svc *ELBv2) DeleteAllListenersInLoadBalancer(ctx context.Context, loadBala
     return nil
 }
 
-func (svc *ELBv2) GetLoadBalancerByName(ctx context.Context, name string) (*types.LoadBalancer, error) {
+func (svc *ELBv2) SearchForLoadBalancerByName(ctx context.Context, name string) (*types.LoadBalancer, error) {
     dlbOutput, err := svc.Client().DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
         Names: []string{name},
     })
@@ -130,4 +129,35 @@ func (svc *ELBv2) GetLoadBalancerByName(ctx context.Context, name string) (*type
     }
 
     return &dlbOutput.LoadBalancers[0], nil
+}
+
+func (svc *ELBv2) SearchForTargetGroupByName(ctx context.Context, name string) (*types.TargetGroup, error) {
+    var (
+        dtgOutput *elbv2.DescribeTargetGroupsOutput
+        marker    *string
+        err       error
+    )
+
+    for {
+        dtgOutput, err = svc.Client().DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
+            Names:  []string{name},
+            Marker: marker,
+        })
+
+        if err != nil {
+            return nil, err
+        }
+
+        if len(dtgOutput.TargetGroups) > 0 {
+            return &dtgOutput.TargetGroups[0], nil
+        }
+
+        marker = dtgOutput.NextMarker
+
+        if marker == nil {
+            break
+        }
+    }
+
+    return nil, err
 }

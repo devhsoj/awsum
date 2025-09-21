@@ -55,6 +55,9 @@ func (svc *AwsumILBService) lazyCreateInstanceTargetGroup(opts CreateInstanceTar
     }
 
     if tgOutput != nil && len(tgOutput.TargetGroups) >= 1 {
+        if tgOutput.TargetGroups[0].Protocol != opts.TrafficProtocol {
+            return "", errors.New("")
+        }
         return memory.Unwrap(tgOutput.TargetGroups[0].TargetGroupArn), nil
     }
 
@@ -103,12 +106,15 @@ func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
 }
 
 type ILBServiceResources struct {
-    TargetGroupArn string
-    SecurityGroup  *ec2Types.SecurityGroup
-    LoadBalancer   *types.LoadBalancer
+    TargetGroupArn      string
+    SecurityGroupId     string
+    LoadBalancerArn     string
+    LoadBalancerDNSName string
 }
 
 func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (*ILBServiceResources, error) {
+    // target selection
+
     instances, err := svc.EC2.GetAllRunningInstances(opts.Ctx)
 
     if err != nil {
@@ -136,34 +142,39 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
 
     targetVPC := instanceVPCs[0]
 
-    targetGroupArn, err := svc.lazyCreateInstanceTargetGroup(CreateInstanceTargetGroupOptions{
-        Ctx:             opts.Ctx,
-        VpcId:           targetVPC,
-        ServiceName:     opts.AwsumResourceName(),
-        TrafficPort:     opts.TrafficPort,
-        TrafficProtocol: opts.TrafficProtocol,
-    })
+    // remove old load balancing resources
+
+    loadBalancer, err := svc.ELBv2.SearchForLoadBalancerByName(opts.Ctx, opts.AwsumResourceName())
 
     if err != nil {
         return nil, err
     }
 
-    if err = svc.ELBv2.DeregisterAllTargetsInTargetGroup(opts.Ctx, targetGroupArn); err != nil {
-        return nil, err
-    }
-
-    for _, instance := range targetInstances {
-        _, err = svc.ELBv2.Client().RegisterTargets(opts.Ctx, &elbv2.RegisterTargetsInput{
-            TargetGroupArn: memory.Pointer(targetGroupArn),
-            Targets: []types.TargetDescription{
-                {Id: instance.Info.InstanceId, Port: memory.Pointer(opts.TrafficPort)},
-            },
-        })
-
-        if err != nil {
+    if loadBalancer != nil {
+        if _, err = svc.ELBv2.Client().DeleteLoadBalancer(opts.Ctx, &elbv2.DeleteLoadBalancerInput{
+            LoadBalancerArn: loadBalancer.LoadBalancerArn,
+        }); err != nil {
             return nil, err
         }
     }
+
+    // remove old target group resources
+
+    targetGroup, err := svc.ELBv2.SearchForTargetGroupByName(opts.Ctx, opts.AwsumResourceName())
+
+    if err != nil {
+        return nil, err
+    }
+
+    if targetGroup != nil {
+        if _, err = svc.ELBv2.Client().DeleteTargetGroup(opts.Ctx, &elbv2.DeleteTargetGroupInput{
+            TargetGroupArn: targetGroup.TargetGroupArn,
+        }); err != nil {
+            return nil, err
+        }
+    }
+
+    // remove old security group resources
 
     securityGroup, err := svc.EC2.SearchForSecurityGroupByName(opts.Ctx, opts.AwsumResourceName())
 
@@ -171,24 +182,28 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         return nil, err
     }
 
-    for securityGroup == nil {
-        if _, err = svc.EC2.CreateEmptySecurityGroup(opts.Ctx, opts.AwsumResourceName()); err != nil {
-            if strings.Contains(err.Error(), "already exists") {
-                break
-            }
-
-            return nil, err
-        }
-
-        securityGroup, err = svc.EC2.SearchForSecurityGroupByName(opts.Ctx, opts.AwsumResourceName())
+    if securityGroup != nil {
+        _, err = svc.EC2.Client().DeleteSecurityGroup(opts.Ctx, &ec2.DeleteSecurityGroupInput{
+            GroupId: securityGroup.GroupId,
+        })
 
         if err != nil {
             return nil, err
         }
     }
 
+    // setup service security group
+
+    cesgOutput, err := svc.EC2.CreateEmptySecurityGroup(opts.Ctx, opts.AwsumResourceName())
+
+    if err != nil {
+        return nil, err
+    }
+
+    securityGroupId := memory.Unwrap(cesgOutput.GroupId)
+
     _, err = svc.EC2.Client().AuthorizeSecurityGroupIngress(opts.Ctx, &ec2.AuthorizeSecurityGroupIngressInput{
-        GroupId: securityGroup.GroupId,
+        GroupId: memory.Pointer(securityGroupId),
         IpPermissions: []ec2Types.IpPermission{
             {
                 FromPort:   memory.Pointer(opts.TrafficPort),
@@ -209,7 +224,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
     }
 
     _, err = svc.EC2.Client().AuthorizeSecurityGroupEgress(opts.Ctx, &ec2.AuthorizeSecurityGroupEgressInput{
-        GroupId: securityGroup.GroupId,
+        GroupId: memory.Pointer(securityGroupId),
         IpPermissions: []ec2Types.IpPermission{
             {
                 FromPort:   memory.Pointer(opts.TrafficPort),
@@ -229,52 +244,76 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         return nil, err
     }
 
-    loadBalancer, err := svc.ELBv2.GetLoadBalancerByName(opts.Ctx, opts.AwsumResourceName())
+    // load balancer creation
+
+    allSubnets, err := svc.EC2.GetAllSubnets(opts.Ctx)
 
     if err != nil {
         return nil, err
     }
 
-    for loadBalancer == nil {
-        allSubnets, err := svc.EC2.GetAllSubnets(opts.Ctx)
+    subnetAzMap := make(map[string]string)
 
-        if err != nil {
-            return nil, err
-        }
+    for _, subnet := range allSubnets {
+        subnetAzMap[memory.Unwrap(subnet.AvailabilityZone)] = memory.Unwrap(subnet.SubnetId)
+    }
 
-        subnetAzMap := make(map[string]string)
+    azGroupedSubnets := slices.Collect(maps.Values(subnetAzMap))
 
-        for _, subnet := range allSubnets {
-            subnetAzMap[memory.Unwrap(subnet.AvailabilityZone)] = memory.Unwrap(subnet.SubnetId)
-        }
+    clbOutput, err := svc.ELBv2.Client().CreateLoadBalancer(opts.Ctx, &elbv2.CreateLoadBalancerInput{
+        Name:           memory.Pointer(opts.AwsumResourceName()),
+        Type:           types.LoadBalancerTypeEnumApplication,
+        Scheme:         types.LoadBalancerSchemeEnumInternetFacing,
+        SecurityGroups: []string{securityGroupId},
+        Subnets:        append(instanceSubnets, azGroupedSubnets...),
+        IpAddressType:  types.IpAddressTypeIpv4,
+    })
 
-        azGroupedSubnets := slices.Collect(maps.Values(subnetAzMap))
+    if err != nil {
+        return nil, err
+    }
 
-        _, err = svc.ELBv2.Client().CreateLoadBalancer(opts.Ctx, &elbv2.CreateLoadBalancerInput{
-            Name:           memory.Pointer(opts.AwsumResourceName()),
-            Type:           types.LoadBalancerTypeEnumApplication,
-            Scheme:         types.LoadBalancerSchemeEnumInternetFacing,
-            SecurityGroups: []string{memory.Unwrap(securityGroup.GroupId)},
-            Subnets:        append(instanceSubnets, azGroupedSubnets...),
-            IpAddressType:  types.IpAddressTypeIpv4,
+    loadBalancerArn := memory.Unwrap(clbOutput.LoadBalancers[0].LoadBalancerArn)
+    loadBalancerDNSName := memory.Unwrap(clbOutput.LoadBalancers[0].DNSName)
+
+    // target group creation
+
+    ctgOutput, err := svc.ELBv2.Client().CreateTargetGroup(opts.Ctx, &elbv2.CreateTargetGroupInput{
+        Name:                    memory.Pointer(opts.AwsumResourceName()),
+        Port:                    memory.Pointer(opts.TrafficPort),
+        Protocol:                opts.TrafficProtocol,
+        VpcId:                   memory.Pointer(targetVPC),
+        TargetType:              types.TargetTypeEnumInstance,
+        HealthCheckPath:         memory.Pointer("/"),
+        HealthCheckProtocol:     opts.TrafficProtocol,
+        HealthCheckPort:         memory.Pointer("traffic-port"),
+        HealthyThresholdCount:   memory.Pointer(int32(3)),
+        UnhealthyThresholdCount: memory.Pointer(int32(3)),
+        Matcher:                 &types.Matcher{HttpCode: memory.Pointer("200,301,302,304")},
+    })
+
+    if err != nil {
+        return nil, err
+    }
+
+    targetGroupArn := memory.Unwrap(ctgOutput.TargetGroups[0].TargetGroupArn)
+
+    // target group registration
+
+    for _, instance := range targetInstances {
+        _, err = svc.ELBv2.Client().RegisterTargets(opts.Ctx, &elbv2.RegisterTargetsInput{
+            TargetGroupArn: memory.Pointer(targetGroupArn),
+            Targets: []types.TargetDescription{
+                {Id: instance.Info.InstanceId, Port: memory.Pointer(opts.TrafficPort)},
+            },
         })
 
         if err != nil {
             return nil, err
         }
-
-        loadBalancer, err = svc.ELBv2.GetLoadBalancerByName(opts.Ctx, opts.AwsumResourceName())
-
-        if err != nil {
-            return nil, err
-        }
     }
 
-    err = svc.ELBv2.DeleteAllListenersInLoadBalancer(opts.Ctx, memory.Unwrap(loadBalancer.LoadBalancerArn))
-
-    if err != nil {
-        return nil, err
-    }
+    // load-balancer certificate and listener setup
 
     var certs []types.Certificate
 
@@ -286,9 +325,11 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         }
     }
 
+    // load-balancer listener creation
+
     _, err = svc.ELBv2.Client().CreateListener(opts.Ctx, &elbv2.CreateListenerInput{
-        LoadBalancerArn: loadBalancer.LoadBalancerArn,
-        Port:            memory.Pointer(int32(opts.LoadBalancerPort)),
+        LoadBalancerArn: memory.Pointer(loadBalancerArn),
+        Port:            memory.Pointer(opts.LoadBalancerPort),
         Protocol:        opts.TrafficProtocol,
         Certificates:    certs,
         DefaultActions: []types.Action{{
@@ -304,8 +345,9 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
     })
 
     return &ILBServiceResources{
-        TargetGroupArn: targetGroupArn,
-        SecurityGroup:  securityGroup,
-        LoadBalancer:   loadBalancer,
+        TargetGroupArn:      targetGroupArn,
+        SecurityGroupId:     securityGroupId,
+        LoadBalancerArn:     loadBalancerArn,
+        LoadBalancerDNSName: loadBalancerDNSName,
     }, err
 }
