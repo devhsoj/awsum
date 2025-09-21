@@ -91,13 +91,13 @@ func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
     return fmt.Sprintf("awsum-ilb-svc-%s", opts.ServiceName)
 }
 
-type InstanceLoadBalancedServiceResources struct {
+type ILBServiceResources struct {
     TargetGroupArn string
     SecurityGroup  *ec2Types.SecurityGroup
     LoadBalancer   *types.LoadBalancer
 }
 
-func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (*InstanceLoadBalancedServiceResources, error) {
+func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (*ILBServiceResources, error) {
     instances, err := svc.EC2.GetAllRunningInstances(opts.Ctx)
 
     if err != nil {
@@ -281,7 +281,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         }},
     })
 
-    return &InstanceLoadBalancedServiceResources{
+    return &ILBServiceResources{
         TargetGroupArn: targetGroupArn,
         SecurityGroup:  securityGroup,
         LoadBalancer:   loadBalancer,
