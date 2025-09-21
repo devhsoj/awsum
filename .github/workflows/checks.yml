@@ -28,6 +28,7 @@ jobs:
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" > ~/.aws/credentials
           
           mkdir -p ~/.ssh
+          touch ~/.ssh/known_hosts
           
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/awsum-demo.pem
       - name: build
