@@ -1,6 +1,6 @@
 # awsum
 
-a fun (cross-platform) CLI tool for working with AWS infra
+a fun CLI tool for working with AWS infra (cross-platform)
 
 ## Getting Started
 *Required:* [Go 1.25](https://go.dev/dl)
@@ -43,6 +43,11 @@ aws_secret_access_key = YOUR_AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
 These commands create a basic configuration for your awsum **and** potential future awscli installations.
 
 ## Usage
+
+All AWS operations triggered by AWS service clients created by awsum are logged to files in a `awsum` directory created in the `~/.aws` directory.
+
+* `~/.aws/awsum/awsum-global-aws-log-output` for a record of all operations done by executions of awsum.
+* `~/.aws/awsum/awsum-session-aws-log-output-YYYY-MM-DD__HH-MM-SS` (filename format) for operations grouped by individual executions of awsum.
 
 To get a description of awsum and how to use its commands and sub-commands:
 ```shell
