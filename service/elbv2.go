@@ -16,6 +16,12 @@ type ELBv2 struct {
     client *elbv2.Client
 }
 
+func NewELBv2(awsConfig aws.Config) *ELBv2 {
+    return &ELBv2{
+        client: elbv2.NewFromConfig(awsConfig),
+    }
+}
+
 func (svc *ELBv2) Client() *elbv2.Client {
     if svc == nil || svc.client == nil {
         fmt.Printf("elbv2 service not initialized!")
@@ -124,10 +130,4 @@ func (svc *ELBv2) GetLoadBalancerByName(ctx context.Context, name string) (*type
     }
 
     return &dlbOutput.LoadBalancers[0], nil
-}
-
-func NewELBv2(awsConfig aws.Config) *ELBv2 {
-    return &ELBv2{
-        client: elbv2.NewFromConfig(awsConfig),
-    }
 }

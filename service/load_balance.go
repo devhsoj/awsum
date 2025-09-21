@@ -26,13 +26,22 @@ var (
 type AwsumILBService struct {
     EC2   *EC2
     ELBv2 *ELBv2
+    ACM   *ACM
+}
+
+func NewAwsumILBService(awsConfig aws.Config) *AwsumILBService {
+    return &AwsumILBService{
+        EC2:   NewEC2(awsConfig),
+        ELBv2: NewELBv2(awsConfig),
+        ACM:   NewACM(awsConfig),
+    }
 }
 
 type CreateInstanceTargetGroupOptions struct {
     Ctx             context.Context
     VpcId           string
     ServiceName     string
-    TrafficPort     uint16
+    TrafficPort     int32
     TrafficProtocol types.ProtocolEnum
 }
 
@@ -52,7 +61,7 @@ func (svc *AwsumILBService) lazyCreateInstanceTargetGroup(opts CreateInstanceTar
     if tgOutput == nil || len(tgOutput.TargetGroups) == 0 {
         ctgOutput, err := svc.ELBv2.Client().CreateTargetGroup(opts.Ctx, &elbv2.CreateTargetGroupInput{
             Name:                    memory.Pointer(opts.ServiceName),
-            Port:                    memory.Pointer(int32(opts.TrafficPort)),
+            Port:                    memory.Pointer(opts.TrafficPort),
             Protocol:                opts.TrafficProtocol,
             VpcId:                   memory.Pointer(opts.VpcId),
             TargetType:              types.TargetTypeEnumInstance,
@@ -79,12 +88,14 @@ func (svc *AwsumILBService) lazyCreateInstanceTargetGroup(opts CreateInstanceTar
 }
 
 type SetupNewILBServiceOptions struct {
-    Ctx                   context.Context
-    ServiceName           string
-    TargetInstanceFilters InstanceFilters
-    TrafficPort           uint16
-    TrafficProtocol       types.ProtocolEnum
-    IpProtocol            string
+    Ctx                    context.Context
+    ServiceName            string
+    TargetInstanceFilters  InstanceFilters
+    LoadBalancerIpProtocol string
+    LoadBalancerPort       int32
+    TrafficPort            int32
+    TrafficProtocol        types.ProtocolEnum
+    CertificateNames       []string
 }
 
 func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
@@ -145,7 +156,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         _, err = svc.ELBv2.Client().RegisterTargets(opts.Ctx, &elbv2.RegisterTargetsInput{
             TargetGroupArn: memory.Pointer(targetGroupArn),
             Targets: []types.TargetDescription{
-                {Id: instance.Info.InstanceId, Port: memory.Pointer(int32(opts.TrafficPort))},
+                {Id: instance.Info.InstanceId, Port: memory.Pointer(opts.TrafficPort)},
             },
         })
 
@@ -180,9 +191,9 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         GroupId: securityGroup.GroupId,
         IpPermissions: []ec2Types.IpPermission{
             {
-                FromPort:   memory.Pointer(int32(opts.TrafficPort)),
-                ToPort:     memory.Pointer(int32(opts.TrafficPort)),
-                IpProtocol: memory.Pointer(opts.IpProtocol),
+                FromPort:   memory.Pointer(opts.TrafficPort),
+                ToPort:     memory.Pointer(opts.TrafficPort),
+                IpProtocol: memory.Pointer(opts.LoadBalancerIpProtocol),
                 IpRanges: []ec2Types.IpRange{
                     {
                         CidrIp:      memory.Pointer("0.0.0.0/0"),
@@ -201,9 +212,9 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         GroupId: securityGroup.GroupId,
         IpPermissions: []ec2Types.IpPermission{
             {
-                FromPort:   memory.Pointer(int32(opts.TrafficPort)),
-                ToPort:     memory.Pointer(int32(opts.TrafficPort)),
-                IpProtocol: memory.Pointer(opts.IpProtocol),
+                FromPort:   memory.Pointer(opts.TrafficPort),
+                ToPort:     memory.Pointer(opts.TrafficPort),
+                IpProtocol: memory.Pointer(opts.LoadBalancerIpProtocol),
                 IpRanges: []ec2Types.IpRange{
                     {
                         CidrIp:      memory.Pointer("0.0.0.0/0"),
@@ -265,10 +276,21 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         return nil, err
     }
 
+    var certs []types.Certificate
+
+    if len(opts.CertificateNames) > 0 {
+        certs, err = svc.ACM.GenerateLoadBalanceCertificateListFromCertificateNames(opts.Ctx, opts.CertificateNames)
+
+        if err != nil {
+            return nil, err
+        }
+    }
+
     _, err = svc.ELBv2.Client().CreateListener(opts.Ctx, &elbv2.CreateListenerInput{
         LoadBalancerArn: loadBalancer.LoadBalancerArn,
-        Port:            memory.Pointer(int32(opts.TrafficPort)),
+        Port:            memory.Pointer(int32(opts.LoadBalancerPort)),
         Protocol:        opts.TrafficProtocol,
+        Certificates:    certs,
         DefaultActions: []types.Action{{
             Type: types.ActionTypeEnumForward,
             ForwardConfig: &types.ForwardActionConfig{
@@ -286,11 +308,4 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         SecurityGroup:  securityGroup,
         LoadBalancer:   loadBalancer,
     }, err
-}
-
-func NewAwsumILBService(awsConfig aws.Config) *AwsumILBService {
-    return &AwsumILBService{
-        EC2:   NewEC2(awsConfig),
-        ELBv2: NewELBv2(awsConfig),
-    }
 }

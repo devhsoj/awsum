@@ -7,6 +7,7 @@ import (
     "os"
     "os/signal"
     "slices"
+    "strconv"
     "strings"
     "sync"
     "syscall"
@@ -117,15 +118,26 @@ func main() {
                                 Usage:    "a fuzzy filter that matches against ec2 instance names (from tags) to include in the load-balance resource creation",
                                 OnlyOnce: true,
                             },
-                            &cli.Uint16Flag{
+                            &cli.StringFlag{
                                 Name:     "port",
-                                Usage:    "the traffic port of your service",
+                                Usage:    "the port to create the load-balancer listener on & the target traffic port of your service on each instance",
+                                OnlyOnce: true,
                                 Required: true,
+                                Validator: func(s string) error {
+                                    parts := strings.Split(s, ":")
+
+                                    if len(parts) != 2 {
+                                        return errors.New("must be in format <load balancer port>:<instance port>")
+                                    }
+
+                                    return nil
+                                },
                             },
                             &cli.StringFlag{
                                 Name:        "protocol",
                                 DefaultText: "http",
-                                Usage:       "the traffic protocol of your service",
+                                Usage:       "the network protocol of the traffic your service uses",
+                                OnlyOnce:    true,
                                 Required:    true,
                                 Value:       "http",
                                 Validator: func(s string) error {
@@ -140,20 +152,42 @@ func main() {
                             &cli.StringFlag{
                                 Name:        "ip-protocol",
                                 DefaultText: "tcp",
-                                Usage:       "the underlying IP protocol for your service",
+                                Usage:       "the underlying IP protocol for your service's load-balancer",
                                 Value:       "tcp",
+                                OnlyOnce:    true,
+                            },
+                            &cli.StringSliceFlag{
+                                Name:     "certificate",
+                                Usage:    "the ACM certificate name(s) to attach to the created listener. the first certificate is default.",
+                                OnlyOnce: false,
                             },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
+                            portParts := strings.Split(command.String("port"), ":")
+
+                            lbPort, err := strconv.ParseInt(portParts[0], 10, 32)
+
+                            if err != nil {
+                                return err
+                            }
+
+                            trafficPort, err := strconv.ParseInt(portParts[1], 10, 32)
+
+                            if err != nil {
+                                return err
+                            }
+
                             return commands.InstanceLoadBalance(commands.InstanceLoadBalanceOptions{
                                 Ctx:         ctx,
                                 ServiceName: command.String("service"),
                                 InstanceFilters: service.InstanceFilters{
                                     Name: command.String("name"),
                                 },
-                                TrafficPort:     command.Uint16("port"),
-                                TrafficProtocol: types.ProtocolEnum(strings.ToUpper(command.String("protocol"))),
-                                IpProtocol:      strings.ToLower(command.String("ip-protocol")),
+                                LoadBalancerPort:       int32(lbPort),
+                                LoadBalancerIpProtocol: strings.ToLower(command.String("ip-protocol")),
+                                TrafficPort:            int32(trafficPort),
+                                TrafficProtocol:        types.ProtocolEnum(strings.ToUpper(command.String("protocol"))),
+                                CertificateNames:       command.StringSlice("certificate"),
                             })
                         },
                     },

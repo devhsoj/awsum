@@ -106,41 +106,49 @@ func InstanceShell(opts InstanceShellOptions) error {
 }
 
 type InstanceLoadBalanceOptions struct {
-    Ctx             context.Context
-    ServiceName     string
-    InstanceFilters service.InstanceFilters
-    TrafficPort     uint16
-    TrafficProtocol types.ProtocolEnum
-    IpProtocol      string
+    Ctx                    context.Context
+    ServiceName            string
+    InstanceFilters        service.InstanceFilters
+    LoadBalancerIpProtocol string
+    LoadBalancerPort       int32
+    TrafficPort            int32
+    TrafficProtocol        types.ProtocolEnum
+    CertificateNames       []string
 }
 
 func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
     resources, err := service.DefaultAwsumILB.SetupNewILBService(service.SetupNewILBServiceOptions{
-        Ctx:                   opts.Ctx,
-        ServiceName:           opts.ServiceName,
-        TargetInstanceFilters: opts.InstanceFilters,
-        TrafficPort:           opts.TrafficPort,
-        TrafficProtocol:       opts.TrafficProtocol,
-        IpProtocol:            opts.IpProtocol,
+        Ctx:                    opts.Ctx,
+        ServiceName:            opts.ServiceName,
+        TargetInstanceFilters:  opts.InstanceFilters,
+        LoadBalancerPort:       opts.LoadBalancerPort,
+        LoadBalancerIpProtocol: opts.LoadBalancerIpProtocol,
+        TrafficPort:            opts.TrafficPort,
+        TrafficProtocol:        opts.TrafficProtocol,
+        CertificateNames:       opts.CertificateNames,
     })
 
     if err != nil {
         return err
     }
 
-    dnsName := memory.Unwrap(resources.LoadBalancer.DNSName)
+    output := memory.Unwrap(resources.LoadBalancer.DNSName)
+
+    if len(opts.CertificateNames) > 0 {
+        output = opts.CertificateNames[0]
+    }
 
     switch opts.TrafficProtocol {
     case types.ProtocolEnumTcp:
-        fmt.Printf("tcp://%s\n", dnsName)
+        fmt.Printf("tcp://%s\n", output)
     case types.ProtocolEnumUdp:
-        fmt.Printf("udp://%s\n", dnsName)
+        fmt.Printf("udp://%s\n", output)
     case types.ProtocolEnumHttp:
-        fmt.Printf("http://%s\n", dnsName)
+        fmt.Printf("http://%s\n", output)
     case types.ProtocolEnumHttps:
-        fmt.Printf("https://%s\n", dnsName)
+        fmt.Printf("https://%s\n", output)
     default:
-        fmt.Println(dnsName)
+        fmt.Println(output)
     }
 
     return nil

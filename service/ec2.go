@@ -25,6 +25,12 @@ type EC2 struct {
     client *ec2.Client
 }
 
+func NewEC2(awsConfig aws.Config) *EC2 {
+    return &EC2{
+        client: ec2.NewFromConfig(awsConfig),
+    }
+}
+
 func (svc *EC2) Client() *ec2.Client {
     if svc == nil || svc.client == nil {
         fmt.Printf("ec2 service not initialized!")
@@ -173,12 +179,6 @@ func (svc *EC2) CreateEmptySecurityGroup(ctx context.Context, name string) (*ec2
             },
         },
     })
-}
-
-func NewEC2(awsConfig aws.Config) *EC2 {
-    return &EC2{
-        client: ec2.NewFromConfig(awsConfig),
-    }
 }
 
 type Instance struct {
