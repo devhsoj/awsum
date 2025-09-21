@@ -5,8 +5,11 @@ import (
     "errors"
     "fmt"
     "os"
+    "os/signal"
     "slices"
     "strings"
+    "sync"
+    "syscall"
 
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
     "github.com/devhsoj/awsum/commands"
@@ -16,7 +19,27 @@ import (
 )
 
 func main() {
-    app.Setup()
+    resources := app.Setup()
+
+    var once sync.Once
+
+    cleanup := func() {
+        once.Do(func() {
+            if cleanupErrors := resources.Cleanup(); len(cleanupErrors) > 0 {
+                for _, err := range cleanupErrors {
+                    fmt.Printf("failed to cleanup local awsum resource: %s\n", err)
+                }
+            }
+        })
+    }
+
+    exit := make(chan os.Signal, 1)
+    signal.Notify(exit, os.Kill, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+
+    defer func() {
+        signal.Stop(exit)
+        cleanup()
+    }()
 
     cmd := &cli.Command{
         Name:        "awsum",
@@ -143,4 +166,7 @@ func main() {
         fmt.Printf("failed to run command: %s\n", err)
         os.Exit(1)
     }
+
+    close(exit)
+    cleanup()
 }

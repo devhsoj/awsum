@@ -7,7 +7,7 @@ import (
 )
 
 func ReadFileFull(filename string) ([]byte, error) {
-    f, err := os.OpenFile(filename, os.O_RDONLY, 0400)
+    f, err := os.OpenFile(filename, os.O_RDONLY, 0644)
 
     if err != nil {
         return nil, fmt.Errorf("failed to open file '%s': %w", filename, err)
@@ -29,7 +29,7 @@ func ReadFileFull(filename string) ([]byte, error) {
 }
 
 func AppendToFile(filename string, buf []byte) error {
-    f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, 0400)
+    f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 
     if err != nil {
         return fmt.Errorf("failed to open file '%s': %w", filename, err)
