@@ -134,15 +134,27 @@ func main() {
                                 },
                             },
                             &cli.StringFlag{
-                                Name:        "protocol",
-                                DefaultText: "http",
-                                Usage:       "the network protocol of the traffic your service uses",
-                                OnlyOnce:    true,
-                                Required:    true,
-                                Value:       "http",
+                                Name:     "protocol",
+                                Usage:    "the network protocol of the traffic your service uses",
+                                OnlyOnce: true,
+                                Required: true,
+                                Value:    "http:http",
                                 Validator: func(s string) error {
-                                    if !slices.Contains(types.ProtocolEnum("").Values(), types.ProtocolEnum(strings.ToUpper(s))) {
-                                        return errors.New("invalid protocol")
+                                    parts := strings.Split(s, ":")
+
+                                    if len(parts) != 2 {
+                                        return errors.New("must be in format <load balancer listener protocol>:<service traffic protocol>")
+                                    }
+
+                                    listenerProtocol := parts[0]
+                                    trafficProtocol := parts[1]
+
+                                    if !slices.Contains(types.ProtocolEnum("").Values(), types.ProtocolEnum(strings.ToUpper(listenerProtocol))) {
+                                        return errors.New("invalid listener protocol")
+                                    }
+
+                                    if !slices.Contains(types.ProtocolEnum("").Values(), types.ProtocolEnum(strings.ToUpper(trafficProtocol))) {
+                                        return errors.New("invalid traffic protocol")
                                     }
 
                                     return nil
@@ -177,17 +189,20 @@ func main() {
                                 return err
                             }
 
+                            protocolParts := strings.Split(command.String("protocol"), ":")
+
                             return commands.InstanceLoadBalance(commands.InstanceLoadBalanceOptions{
                                 Ctx:         ctx,
                                 ServiceName: command.String("service"),
                                 InstanceFilters: service.InstanceFilters{
                                     Name: command.String("name"),
                                 },
-                                LoadBalancerPort:       int32(lbPort),
-                                LoadBalancerIpProtocol: strings.ToLower(command.String("ip-protocol")),
-                                TrafficPort:            int32(trafficPort),
-                                TrafficProtocol:        types.ProtocolEnum(strings.ToUpper(command.String("protocol"))),
-                                CertificateNames:       command.StringSlice("certificate"),
+                                LoadBalancerPort:             int32(lbPort),
+                                LoadBalancerIpProtocol:       strings.ToLower(command.String("ip-protocol")),
+                                LoadBalancerListenerProtocol: types.ProtocolEnum(strings.ToUpper(protocolParts[0])),
+                                TrafficPort:                  int32(trafficPort),
+                                TrafficProtocol:              types.ProtocolEnum(strings.ToUpper(protocolParts[1])),
+                                CertificateNames:             command.StringSlice("certificate"),
                             })
                         },
                     },

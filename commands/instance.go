@@ -110,26 +110,28 @@ func InstanceShell(opts InstanceShellOptions) error {
 }
 
 type InstanceLoadBalanceOptions struct {
-    Ctx                    context.Context
-    ServiceName            string
-    InstanceFilters        service.InstanceFilters
-    LoadBalancerIpProtocol string
-    LoadBalancerPort       int32
-    TrafficPort            int32
-    TrafficProtocol        types.ProtocolEnum
-    CertificateNames       []string
+    Ctx                          context.Context
+    ServiceName                  string
+    InstanceFilters              service.InstanceFilters
+    LoadBalancerListenerProtocol types.ProtocolEnum
+    LoadBalancerIpProtocol       string
+    LoadBalancerPort             int32
+    TrafficPort                  int32
+    TrafficProtocol              types.ProtocolEnum
+    CertificateNames             []string
 }
 
 func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
     resources, err := service.DefaultAwsumILB.SetupNewILBService(service.SetupNewILBServiceOptions{
-        Ctx:                    opts.Ctx,
-        ServiceName:            opts.ServiceName,
-        TargetInstanceFilters:  opts.InstanceFilters,
-        LoadBalancerPort:       opts.LoadBalancerPort,
-        LoadBalancerIpProtocol: opts.LoadBalancerIpProtocol,
-        TrafficPort:            opts.TrafficPort,
-        TrafficProtocol:        opts.TrafficProtocol,
-        CertificateNames:       opts.CertificateNames,
+        Ctx:                          opts.Ctx,
+        ServiceName:                  opts.ServiceName,
+        TargetInstanceFilters:        opts.InstanceFilters,
+        LoadBalancerListenerProtocol: opts.LoadBalancerListenerProtocol,
+        LoadBalancerIpProtocol:       opts.LoadBalancerIpProtocol,
+        LoadBalancerPort:             opts.LoadBalancerPort,
+        TrafficPort:                  opts.TrafficPort,
+        TrafficProtocol:              opts.TrafficProtocol,
+        CertificateNames:             opts.CertificateNames,
     })
 
     if err != nil {
@@ -138,11 +140,7 @@ func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
 
     output := resources.LoadBalancerDNSName
 
-    if len(opts.CertificateNames) > 0 {
-        output = opts.CertificateNames[0]
-    }
-
-    switch opts.TrafficProtocol {
+    switch opts.LoadBalancerListenerProtocol {
     case types.ProtocolEnumTcp:
         fmt.Printf("tcp://%s\n", output)
     case types.ProtocolEnumUdp:

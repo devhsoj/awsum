@@ -9,7 +9,7 @@ a fun CLI tool for working with AWS infra (cross-platform)
 ```shell
 git clone https://github.com/levelshatter/awsum
 cd awsum/
-go install
+go install 
 ```
 
 **Installing via go install:**
@@ -47,7 +47,7 @@ These commands create a basic configuration for your awsum **and** potential fut
 All AWS operations triggered by AWS service clients created by awsum are logged to files in a `awsum` directory created in the `~/.aws` directory.
 
 * `~/.aws/awsum/awsum-global-aws-log-output` for a record of all operations done by executions of awsum.
-* `~/.aws/awsum/awsum-session-aws-log-output-YYYY-MM-DD__HH-MM-SS` (filename format) for operations grouped by individual executions of awsum.
+* `~/.aws/awsum/awsum-session-aws-log-output-YYYY-MM-DD__HH-mm-SS` for operations grouped by individual executions of awsum.
 
 To get a description of awsum and how to use its commands and sub-commands:
 ```shell
@@ -78,22 +78,20 @@ awsum instance shell --name website "df -h"
 
 Basic app deployment w/ load-balancing (Amazon Linux example):
 
-**Note:** awsum does not modify any non-awsum related security groups, the security group(s) attached to your instances,
-your Route 53 records, or any of your certificates. awsum is designed this way to prevent breaking or insecure configurations
-to your already existing or newly created infrastructure.
+**Note:** awsum does not modify any non-awsum related resources to prevent breaking existing infrastructure.
 
 ```shell
 # basic deployment
 
-awsum instance shell --name demo "sudo yum install docker -y"
-awsum instance shell --name demo "sudo service docker start"
-awsum instance shell --name demo "sudo usermod -aG docker ec2-user"
-awsum instance shell --name demo "docker rm nginx --force"
-awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos/hello"
+awsum instance shell --name demo "sudo yum install docker -y
+sudo service docker start
+sudo usermod -aG docker ec2-user
+docker rm nginx --force
+docker run -d -p 80:80 --name nginx nginxdemos/hello"
 
-# load balancing
+# load balancing - load balance an http service running on port 80 on instances matching the name "demo" using https with an ACM cert
 
-awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https --certificate "awsum.levelshatter.com"
+awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https:http --certificate "levelshatter.com"
 ```
 
 awsum really shines when used in CI/CD processes.

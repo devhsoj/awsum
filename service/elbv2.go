@@ -145,6 +145,10 @@ func (svc *ELBv2) SearchForTargetGroupByName(ctx context.Context, name string) (
         })
 
         if err != nil {
+            if strings.Contains(err.Error(), "not found") {
+                return nil, nil
+            }
+
             return nil, err
         }
 

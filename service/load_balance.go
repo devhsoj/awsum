@@ -45,60 +45,16 @@ type CreateInstanceTargetGroupOptions struct {
     TrafficProtocol types.ProtocolEnum
 }
 
-func (svc *AwsumILBService) lazyCreateInstanceTargetGroup(opts CreateInstanceTargetGroupOptions) (string, error) {
-    tgOutput, err := svc.ELBv2.Client().DescribeTargetGroups(opts.Ctx, &elbv2.DescribeTargetGroupsInput{
-        Names: []string{opts.ServiceName},
-    })
-
-    if err != nil && !strings.Contains(err.Error(), "TargetGroupNotFound") {
-        return "", err
-    }
-
-    if tgOutput != nil && len(tgOutput.TargetGroups) >= 1 {
-        if tgOutput.TargetGroups[0].Protocol != opts.TrafficProtocol {
-            return "", errors.New("")
-        }
-        return memory.Unwrap(tgOutput.TargetGroups[0].TargetGroupArn), nil
-    }
-
-    if tgOutput == nil || len(tgOutput.TargetGroups) == 0 {
-        ctgOutput, err := svc.ELBv2.Client().CreateTargetGroup(opts.Ctx, &elbv2.CreateTargetGroupInput{
-            Name:                    memory.Pointer(opts.ServiceName),
-            Port:                    memory.Pointer(opts.TrafficPort),
-            Protocol:                opts.TrafficProtocol,
-            VpcId:                   memory.Pointer(opts.VpcId),
-            TargetType:              types.TargetTypeEnumInstance,
-            HealthCheckPath:         memory.Pointer("/"),
-            HealthCheckProtocol:     types.ProtocolEnumHttp,
-            HealthCheckPort:         memory.Pointer("traffic-port"),
-            HealthyThresholdCount:   memory.Pointer(int32(3)),
-            UnhealthyThresholdCount: memory.Pointer(int32(3)),
-            Matcher:                 &types.Matcher{HttpCode: memory.Pointer("200,301,302,304")},
-        })
-
-        if err != nil {
-            return "", err
-        }
-
-        if len(ctgOutput.TargetGroups) == 0 {
-            return "", ErrTargetGroupNotReturnedAfterCreation
-        }
-
-        return memory.Unwrap(ctgOutput.TargetGroups[0].TargetGroupArn), nil
-    }
-
-    return "", nil
-}
-
 type SetupNewILBServiceOptions struct {
-    Ctx                    context.Context
-    ServiceName            string
-    TargetInstanceFilters  InstanceFilters
-    LoadBalancerIpProtocol string
-    LoadBalancerPort       int32
-    TrafficPort            int32
-    TrafficProtocol        types.ProtocolEnum
-    CertificateNames       []string
+    Ctx                          context.Context
+    ServiceName                  string
+    TargetInstanceFilters        InstanceFilters
+    LoadBalancerListenerProtocol types.ProtocolEnum
+    LoadBalancerIpProtocol       string
+    LoadBalancerPort             int32
+    TrafficPort                  int32
+    TrafficProtocol              types.ProtocolEnum
+    CertificateNames             []string
 }
 
 func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
@@ -223,6 +179,27 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         return nil, err
     }
 
+    _, err = svc.EC2.Client().AuthorizeSecurityGroupIngress(opts.Ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+        GroupId: memory.Pointer(resources.SecurityGroupId),
+        IpPermissions: []ec2Types.IpPermission{
+            {
+                FromPort:   memory.Pointer(opts.LoadBalancerPort),
+                ToPort:     memory.Pointer(opts.LoadBalancerPort),
+                IpProtocol: memory.Pointer(opts.LoadBalancerIpProtocol),
+                IpRanges: []ec2Types.IpRange{
+                    {
+                        CidrIp:      memory.Pointer("0.0.0.0/0"),
+                        Description: memory.Pointer("all inbound traffic"),
+                    },
+                },
+            },
+        },
+    })
+
+    if err != nil && !strings.Contains(err.Error(), "already exists") {
+        return nil, err
+    }
+
     _, err = svc.EC2.Client().AuthorizeSecurityGroupEgress(opts.Ctx, &ec2.AuthorizeSecurityGroupEgressInput{
         GroupId: memory.Pointer(resources.SecurityGroupId),
         IpPermissions: []ec2Types.IpPermission{
@@ -260,12 +237,10 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         }
 
         for _, listener := range listeners {
-            if memory.Unwrap(listener.Port) == opts.LoadBalancerPort {
-                if _, err = svc.ELBv2.Client().DeleteListener(opts.Ctx, &elbv2.DeleteListenerInput{
-                    ListenerArn: listener.ListenerArn,
-                }); err != nil {
-                    return nil, err
-                }
+            if _, err = svc.ELBv2.Client().DeleteListener(opts.Ctx, &elbv2.DeleteListenerInput{
+                ListenerArn: listener.ListenerArn,
+            }); err != nil {
+                return nil, err
             }
         }
 
@@ -323,19 +298,15 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
 
     // target group creation
 
-    ctgOutput, err := svc.ELBv2.Client().CreateTargetGroup(opts.Ctx, &elbv2.CreateTargetGroupInput{
-        Name:                    memory.Pointer(opts.AwsumResourceName()),
-        Port:                    memory.Pointer(opts.TrafficPort),
-        Protocol:                opts.TrafficProtocol,
-        VpcId:                   memory.Pointer(targetVPC),
-        TargetType:              types.TargetTypeEnumInstance,
-        HealthCheckPath:         memory.Pointer("/"),
-        HealthCheckProtocol:     opts.TrafficProtocol,
-        HealthCheckPort:         memory.Pointer("traffic-port"),
-        HealthyThresholdCount:   memory.Pointer(int32(3)),
-        UnhealthyThresholdCount: memory.Pointer(int32(3)),
-        Matcher:                 &types.Matcher{HttpCode: memory.Pointer("200,301,302,304")},
-    })
+    ctgInput := elbv2.CreateTargetGroupInput{
+        Name:       memory.Pointer(opts.AwsumResourceName()),
+        Port:       memory.Pointer(opts.TrafficPort),
+        Protocol:   opts.TrafficProtocol,
+        VpcId:      memory.Pointer(targetVPC),
+        TargetType: types.TargetTypeEnumInstance,
+    }
+
+    ctgOutput, err := svc.ELBv2.Client().CreateTargetGroup(opts.Ctx, &ctgInput)
 
     if err != nil {
         return nil, err
@@ -373,7 +344,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
     _, err = svc.ELBv2.Client().CreateListener(opts.Ctx, &elbv2.CreateListenerInput{
         LoadBalancerArn: memory.Pointer(resources.LoadBalancerArn),
         Port:            memory.Pointer(opts.LoadBalancerPort),
-        Protocol:        opts.TrafficProtocol,
+        Protocol:        opts.LoadBalancerListenerProtocol,
         Certificates:    certs,
         DefaultActions: []types.Action{{
             Type: types.ActionTypeEnumForward,
