@@ -93,7 +93,7 @@ awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos
 
 # load balancing
 
-awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https --certificate "demo.awsum.levelshatter.com"
+awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https --certificate "awsum.levelshatter.com"
 ```
 
 awsum really shines when used in CI/CD processes.
