@@ -90,7 +90,11 @@ func InstanceShell(opts InstanceShellOptions) error {
 
     for _, instance := range opts.InstanceFilters.Matches(instances) {
         if len(opts.Command) == 0 {
-            return instance.AttachShell(opts.User)
+            if err = instance.AttachShell(opts.User); err != nil {
+                return err
+            }
+
+            continue
         }
 
         fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())

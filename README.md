@@ -61,38 +61,39 @@ awsum instance
 
 ### Real-World Examples
 
-Get a list of all instances
+Get a list of all instances in csv:
 ```shell
 awsum instance list --format csv
 ```
 
-Get the free disk space of every ec2 instance with a name matching "website" (assuming nix-like system):
+Sequentially open a secure shell (SSH) to every instance with a name matching "game-server":
+```shell
+awsum instance shell --name "game-server"
+```
+
+Get the free disk space of every ec2 instance with a name matching "website" over SSH:
 ```shell
 awsum instance shell --name website "df -h"
 ```
 
-Basic app deployment w/ load-balancing (Amazon Linux):
+Basic app deployment w/ load-balancing (Amazon Linux example):
+
+**Note:** awsum does not modify any non-awsum related security groups, the security group(s) attached to your instances,
+your Route 53 records, or any of your certificates. awsum is designed this way to prevent breaking or insecure configurations
+to your already existing or newly created infrastructure.
+
 ```shell
-#!/bin/bash
-
-instance_name_filter=$1
-
-if [[ -z $instance_name_filter ]] then
-	echo "usage: $0 [INSTANCE NAME FILTER]"
-	exit 1
-fi
-
 # basic deployment
 
-awsum instance shell --name "$instance_name_filter" "sudo yum install docker -y"
-awsum instance shell --name "$instance_name_filter" "sudo service docker start"
-awsum instance shell --name "$instance_name_filter" "sudo usermod -aG docker ec2-user"
-awsum instance shell --name "$instance_name_filter" "docker rm nginx --force"
-awsum instance shell --name "$instance_name_filter" "docker run -d -p 80:80 --name nginx nginxdemos/hello"
+awsum instance shell --name demo "sudo yum install docker -y"
+awsum instance shell --name demo "sudo service docker start"
+awsum instance shell --name demo "sudo usermod -aG docker ec2-user"
+awsum instance shell --name demo "docker rm nginx --force"
+awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos/hello"
 
 # load balancing
 
-awsum instance load-balance --service "nginx-demo" --name "$instance_name_filter" --port 80 --protocol http
+awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https --certificate "demo.awsum.levelshatter.com"
 ```
 
 awsum really shines when used in CI/CD processes.
