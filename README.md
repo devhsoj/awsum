@@ -79,15 +79,16 @@ awsum instance shell --name website "df -h"
 Basic app deployment w/ load-balancing (Amazon Linux example):
 
 **Note:** awsum does not modify any non-awsum related resources to prevent breaking existing infrastructure.
+**Note 2:** This is actually an exact replica of the demo deployment done by awsum [NGINX Demo](https://awsum.levelshatter.com/).
 
 ```shell
 # basic deployment
 
-awsum instance shell --name demo "sudo yum install docker -y
-sudo service docker start
-sudo usermod -aG docker ec2-user
-docker rm nginx --force
-docker run -d -p 80:80 --name nginx nginxdemos/hello"
+awsum instance shell --name demo "sudo yum install docker -y"
+awsum instance shell --name demo "sudo service docker start"
+awsum instance shell --name demo "sudo usermod -aG docker ec2-user"
+awsum instance shell --name demo "docker rm nginx --force"
+awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos/hello"
 
 # load balancing - load balance an http service running on port 80 on instances matching the name "demo" using https with an ACM cert
 
