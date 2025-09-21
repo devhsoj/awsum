@@ -91,11 +91,17 @@ func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
     return fmt.Sprintf("awsum-ilb-svc-%s", opts.ServiceName)
 }
 
-func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) error {
+type InstanceLoadBalancedServiceResources struct {
+    TargetGroupArn string
+    SecurityGroup  *ec2Types.SecurityGroup
+    LoadBalancer   *types.LoadBalancer
+}
+
+func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (*InstanceLoadBalancedServiceResources, error) {
     instances, err := svc.EC2.GetAllRunningInstances(opts.Ctx)
 
     if err != nil {
-        return err
+        return nil, err
     }
 
     targetInstances := opts.TargetInstanceFilters.Matches(instances)
@@ -114,7 +120,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
     instanceSubnets := slices.Collect(maps.Keys(subnetIdMap))
 
     if len(instanceVPCs) > 1 {
-        return ErrTargetInstancesMustAllBeInSameVPC
+        return nil, ErrTargetInstancesMustAllBeInSameVPC
     }
 
     targetVPC := instanceVPCs[0]
@@ -128,11 +134,11 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
     })
 
     if err != nil {
-        return err
+        return nil, err
     }
 
     if err = svc.ELBv2.DeregisterAllTargetsInTargetGroup(opts.Ctx, targetGroupArn); err != nil {
-        return err
+        return nil, err
     }
 
     for _, instance := range targetInstances {
@@ -144,14 +150,14 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
         })
 
         if err != nil {
-            return err
+            return nil, err
         }
     }
 
     securityGroup, err := svc.EC2.SearchForSecurityGroupByName(opts.Ctx, opts.AwsumResourceName())
 
     if err != nil {
-        return err
+        return nil, err
     }
 
     for securityGroup == nil {
@@ -160,13 +166,13 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
                 break
             }
 
-            return err
+            return nil, err
         }
 
         securityGroup, err = svc.EC2.SearchForSecurityGroupByName(opts.Ctx, opts.AwsumResourceName())
 
         if err != nil {
-            return err
+            return nil, err
         }
     }
 
@@ -188,7 +194,7 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
     })
 
     if err != nil && !strings.Contains(err.Error(), "already exists") {
-        return err
+        return nil, err
     }
 
     _, err = svc.EC2.Client().AuthorizeSecurityGroupEgress(opts.Ctx, &ec2.AuthorizeSecurityGroupEgressInput{
@@ -209,20 +215,20 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
     })
 
     if err != nil && !strings.Contains(err.Error(), "already exists") {
-        return err
+        return nil, err
     }
 
     loadBalancer, err := svc.ELBv2.GetLoadBalancerByName(opts.Ctx, opts.AwsumResourceName())
 
     if err != nil {
-        return err
+        return nil, err
     }
 
     for loadBalancer == nil {
         allSubnets, err := svc.EC2.GetAllSubnets(opts.Ctx)
 
         if err != nil {
-            return err
+            return nil, err
         }
 
         subnetAzMap := make(map[string]string)
@@ -243,20 +249,20 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
         })
 
         if err != nil {
-            return err
+            return nil, err
         }
 
         loadBalancer, err = svc.ELBv2.GetLoadBalancerByName(opts.Ctx, opts.AwsumResourceName())
 
         if err != nil {
-            return err
+            return nil, err
         }
     }
 
     err = svc.ELBv2.DeleteAllListenersInLoadBalancer(opts.Ctx, memory.Unwrap(loadBalancer.LoadBalancerArn))
 
     if err != nil {
-        return err
+        return nil, err
     }
 
     _, err = svc.ELBv2.Client().CreateListener(opts.Ctx, &elbv2.CreateListenerInput{
@@ -275,7 +281,11 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) e
         }},
     })
 
-    return err
+    return &InstanceLoadBalancedServiceResources{
+        TargetGroupArn: targetGroupArn,
+        SecurityGroup:  securityGroup,
+        LoadBalancer:   loadBalancer,
+    }, err
 }
 
 func NewAwsumILBService(awsConfig aws.Config) *AwsumILBService {

@@ -115,7 +115,7 @@ type InstanceLoadBalanceOptions struct {
 }
 
 func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
-    return service.DefaultAwsumILB.SetupNewILBService(service.SetupNewILBServiceOptions{
+    resources, err := service.DefaultAwsumILB.SetupNewILBService(service.SetupNewILBServiceOptions{
         Ctx:                   opts.Ctx,
         ServiceName:           opts.ServiceName,
         TargetInstanceFilters: opts.InstanceFilters,
@@ -123,4 +123,25 @@ func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
         TrafficProtocol:       opts.TrafficProtocol,
         IpProtocol:            opts.IpProtocol,
     })
+
+    if err != nil {
+        return err
+    }
+
+    dnsName := memory.Unwrap(resources.LoadBalancer.DNSName)
+
+    switch opts.TrafficProtocol {
+    case types.ProtocolEnumTcp:
+        fmt.Printf("tcp://%s\n", dnsName)
+    case types.ProtocolEnumUdp:
+        fmt.Printf("udp://%s\n", dnsName)
+    case types.ProtocolEnumHttp:
+        fmt.Printf("http://%s\n", dnsName)
+    case types.ProtocolEnumHttps:
+        fmt.Printf("https://%s\n", dnsName)
+    default:
+        fmt.Println(dnsName)
+    }
+
+    return nil
 }
