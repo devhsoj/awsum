@@ -181,6 +181,35 @@ func (svc *EC2) CreateEmptySecurityGroup(ctx context.Context, name string) (*ec2
     })
 }
 
+func (svc *EC2) GetAllSecurityGroupRules(ctx context.Context) ([]types.SecurityGroupRule, error) {
+    var (
+        output    *ec2.DescribeSecurityGroupRulesOutput
+        rules     []types.SecurityGroupRule
+        nextToken *string
+        err       error
+    )
+
+    for {
+        output, err = svc.Client().DescribeSecurityGroupRules(ctx, &ec2.DescribeSecurityGroupRulesInput{
+            NextToken: nextToken,
+        })
+
+        if err != nil {
+            return nil, err
+        }
+
+        rules = append(rules, output.SecurityGroupRules...)
+
+        nextToken = output.NextToken
+
+        if nextToken == nil {
+            break
+        }
+    }
+
+    return nil, nil
+}
+
 type Instance struct {
     Info    types.Instance
     Service *EC2
