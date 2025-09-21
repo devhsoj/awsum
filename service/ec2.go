@@ -264,6 +264,10 @@ func (i *Instance) GenerateSSHClientConfigFromAssumedUserKey(user string) (*ssh.
 
     hostKeyCallback, err := files.GenerateHostKeyCallbackFromKnownHosts()
 
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate host key callback from known hosts: %w", err)
+    }
+
     signer, err := ssh.ParsePrivateKey(privateKeyBuf)
 
     if err != nil {
