@@ -16,6 +16,16 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.25'
+    - name: configure
+      run: |
+        mkdir ~/.aws
+
+        echo "[default]
+        region = ${{ secrets.AWS_REGION }}" > ~/.aws/config
+
+        echo "[default]
+        aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" > ~/.aws/credentials
     - name: build
       run: go build
     - name: test
@@ -24,15 +34,6 @@ jobs:
       run: go install
     - name: demo deploy
       run: |
-        mkdir ~/.aws
-
-        echo "[default]
-        region = ${{ secrets.AWS_REGION }}" > ~/.aws/config
-        
-        echo "[default]
-        aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" > ~/.aws/credentials
-
         awsum instance shell --name demo "sudo yum install docker -y
         sudo service docker start
         sudo usermod -aG docker ec2-user
