@@ -79,6 +79,7 @@ type InstanceShellOptions struct {
     InstanceFilters service.InstanceFilters
     User            string
     Command         string
+    Quiet           bool
 }
 
 func InstanceShell(opts InstanceShellOptions) error {
@@ -97,13 +98,17 @@ func InstanceShell(opts InstanceShellOptions) error {
             continue
         }
 
-        fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
+        if !opts.Quiet {
+            fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
+        }
 
         if err = instance.RunInteractiveCommand(opts.User, opts.Command); err != nil {
             return err
         }
 
-        fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+        if !opts.Quiet {
+            fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+        }
     }
 
     return nil

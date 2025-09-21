@@ -90,6 +90,13 @@ func main() {
                                 Usage:    "a fuzzy filter that matches against ec2 instance names (from tags)",
                                 OnlyOnce: true,
                             },
+                            &cli.BoolFlag{
+                                Name:     "quiet",
+                                Aliases:  []string{"q"},
+                                Usage:    "whether to disable the additional debug information when a shell starts and ends",
+                                Value:    false,
+                                OnlyOnce: true,
+                            },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
                             return commands.InstanceShell(commands.InstanceShellOptions{
@@ -99,6 +106,7 @@ func main() {
                                 },
                                 User:    command.String("user"),
                                 Command: strings.Join(command.Args().Slice(), " "),
+                                Quiet:   command.Bool("quiet"),
                             })
                         },
                     },
