@@ -59,7 +59,7 @@ Get a list of all instances in csv:
 awsum instance list --format csv
 ```
 
-Sequentially open a secure shell (SSH) to every instance with a name matching "game-server":
+Sequentially open a secure shell (SSH) to every instance with a name matching "worker":
 ```shell
 awsum instance shell --name "worker"
 ```
