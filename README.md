@@ -2,7 +2,7 @@
 
 a fun CLI tool for working with AWS infra (cross-platform)
 
-## Getting Started
+## Installation
 *Required:* [Go 1.25](https://go.dev/dl)
 
 **Installing from source:**
@@ -30,14 +30,7 @@ If you have [awscli](https://aws.amazon.com/cli/) installed & configured, you ar
 If not, then you can do the following:
 
 ```shell
-mkdir ~/.aws
-
-echo "[default]
-region = YOUR_REGION" > ~/.aws/config
-
-echo "[default]
-aws_access_key_id = YOUR_AWS_ACCESS_KEY_ID
-aws_secret_access_key = YOUR_AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+awsum configure
 ```
 
 These commands create a basic configuration for your awsum **and** potential future awscli installations.
@@ -51,12 +44,12 @@ All AWS operations triggered by AWS service clients created by awsum are logged 
 
 To get a description of awsum and how to use its commands and sub-commands:
 ```shell
-awsum help
+awsum --help
 ```
 
 **(Example)** To get help with commands and sub-commands:
 ```shell
-awsum instance
+awsum instance --help
 ```
 
 ### Real-World Examples
@@ -68,7 +61,7 @@ awsum instance list --format csv
 
 Sequentially open a secure shell (SSH) to every instance with a name matching "game-server":
 ```shell
-awsum instance shell --name "game-server"
+awsum instance shell --name "worker"
 ```
 
 Get the free disk space of every ec2 instance with a name matching "website" over SSH:

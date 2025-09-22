@@ -48,6 +48,12 @@ func main() {
         Description: "awsum allows you to rapidly develop with your own infra via the command line",
         Commands: []*cli.Command{
             {
+                Name: "configure",
+                Action: func(ctx context.Context, command *cli.Command) error {
+                    return commands.Configure()
+                },
+            },
+            {
                 Name: "instance",
                 Commands: []*cli.Command{
                     {

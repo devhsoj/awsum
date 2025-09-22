@@ -46,7 +46,7 @@ func GenerateHostKeyCallbackFromKnownHosts() (ssh.HostKeyCallback, error) {
                     knownhosts.Normalize(hostname),
                 }, key)
 
-                return AppendToFile(knownHostsFilename, []byte(line+"\n"))
+                return WriteToFile(knownHostsFilename, []byte(line+"\n"), true)
             }
 
             return err

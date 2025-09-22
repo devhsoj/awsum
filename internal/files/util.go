@@ -28,8 +28,16 @@ func ReadFileFull(filename string) ([]byte, error) {
     return buf, nil
 }
 
-func AppendToFile(filename string, buf []byte) error {
-    f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+func WriteToFile(filename string, buf []byte, append ...bool) error {
+    flags := os.O_CREATE | os.O_WRONLY
+
+    if len(append) > 0 && append[0] {
+        flags |= os.O_APPEND
+    } else {
+        flags |= os.O_TRUNC
+    }
+
+    f, err := os.OpenFile(filename, flags, 0644)
 
     if err != nil {
         return fmt.Errorf("failed to open file '%s': %w", filename, err)
@@ -42,7 +50,7 @@ func AppendToFile(filename string, buf []byte) error {
     }()
 
     if _, err = f.Write(buf); err != nil {
-        return fmt.Errorf("failed to append to file '%s': %w", filename, err)
+        return fmt.Errorf("failed to write to file '%s': %w", filename, err)
     }
 
     return f.Sync()

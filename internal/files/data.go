@@ -5,7 +5,7 @@ import (
     "path"
 )
 
-func CreateDataDirectory() (string, error) {
+func CreateAwsumDataDirectory() (string, error) {
     homeDir, err := os.UserHomeDir()
 
     if err != nil {
@@ -28,7 +28,7 @@ func CreateDataDirectory() (string, error) {
 
 // OpenAwsumFile opens a file with the given parameters in the awsum data directory.
 func OpenAwsumFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
-    dataDir, err := CreateDataDirectory()
+    dataDir, err := CreateAwsumDataDirectory()
 
     if err != nil {
         return nil, err
