@@ -10,7 +10,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/acm"
     acmTypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-    "github.com/devhsoj/awsum/internal/memory"
+    "github.com/levelshatter/awsum/internal/memory"
 )
 
 type ACM struct {

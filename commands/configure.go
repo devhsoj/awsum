@@ -5,7 +5,7 @@ import (
     "os"
     "path"
 
-    "github.com/devhsoj/awsum/internal/files"
+    "github.com/levelshatter/awsum/internal/files"
 )
 
 const basicDefaultAwsCLIConfigContents = `[default]

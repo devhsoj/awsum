@@ -1,4 +1,4 @@
-module github.com/devhsoj/awsum
+module github.com/levelshatter/awsum
 
 go 1.25
 

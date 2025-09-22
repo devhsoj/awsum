@@ -15,8 +15,8 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/service/ec2"
     "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-    "github.com/devhsoj/awsum/internal/files"
-    "github.com/devhsoj/awsum/internal/memory"
+    "github.com/levelshatter/awsum/internal/files"
+    "github.com/levelshatter/awsum/internal/memory"
     "golang.org/x/crypto/ssh"
     "golang.org/x/term"
 )

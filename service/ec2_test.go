@@ -4,8 +4,8 @@ import (
     "fmt"
     "testing"
 
-    "github.com/devhsoj/awsum/internal/app"
-    "github.com/devhsoj/awsum/service"
+    "github.com/levelshatter/awsum/internal/app"
+    "github.com/levelshatter/awsum/service"
     "github.com/stretchr/testify/assert"
 )
 

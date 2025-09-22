@@ -11,8 +11,8 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/smithy-go/logging"
-    "github.com/devhsoj/awsum/internal/files"
-    "github.com/devhsoj/awsum/service"
+    "github.com/levelshatter/awsum/internal/files"
+    "github.com/levelshatter/awsum/service"
 )
 
 var Ctx = context.Background()

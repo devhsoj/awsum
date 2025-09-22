@@ -7,8 +7,8 @@ import (
     "os"
 
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-    "github.com/devhsoj/awsum/internal/memory"
-    "github.com/devhsoj/awsum/service"
+    "github.com/levelshatter/awsum/internal/memory"
+    "github.com/levelshatter/awsum/service"
     "github.com/olekukonko/tablewriter"
 )
 

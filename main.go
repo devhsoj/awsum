@@ -13,9 +13,9 @@ import (
     "syscall"
 
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-    "github.com/devhsoj/awsum/commands"
-    "github.com/devhsoj/awsum/internal/app"
-    "github.com/devhsoj/awsum/service"
+    "github.com/levelshatter/awsum/commands"
+    "github.com/levelshatter/awsum/internal/app"
+    "github.com/levelshatter/awsum/service"
     "github.com/urfave/cli/v3"
 )
 
