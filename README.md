@@ -71,21 +71,31 @@ awsum instance shell --name website "df -h"
 
 Basic app deployment w/ load-balancing (Amazon Linux example):
 
-**Note:** awsum does not modify any non-related resources to prevent breaking existing infrastructure.
+**Note:** awsum does not modify any non-command-related resources to prevent breaking existing infrastructure.
+
 **Note 2:** This is actually an exact replica of the demo deployment done by awsum (on two t2.nano instances) [NGINX Demo](https://awsum.levelshatter.com/).
 
-```shell
-# basic deployment
+**Note 3:** Please, please, please, properly secure your CI/CD platforms, your instances, and lock down the users awsum will authenticate as, you do not want to give fully privileged RCE to anyone/and or service making code changes...
 
-awsum instance shell --name demo "sudo yum install docker -y"
-awsum instance shell --name demo "sudo service docker start"
-awsum instance shell --name demo "sudo usermod -aG docker ec2-user"
+```shell
+# basic deployment logic
+
 awsum instance shell --name demo "docker rm nginx --force"
 awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos/hello"
 
-# load balancing - load balance an http service running on port 80 on instances matching the name "demo" using https with an ACM cert
+"
+load balance an http service running on port 80 on
+instances matching the name "demo" using https with
+a certificate from ACM and with a domain pointing to it.
+"
 
-awsum instance load-balance --service "nginx-demo" --name demo --port 443:80 --protocol https:http --certificate "levelshatter.com"
+awsum instance load-balance \
+    --service "nginx-demo" \
+    --name demo \
+    --port 443:80 \
+    --protocol https:http \
+    --certificate "levelshatter.com" \
+    --domain "awsum.levelshatter.com"
 ```
 
 awsum really shines when used in CI/CD processes.

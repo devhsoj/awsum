@@ -42,8 +42,6 @@ func Configure() error {
         return err
     }
 
-    fmt.Println(awsPath)
-
     if _, err = files.CreateAwsumDataDirectory(); err != nil {
         return err
     }

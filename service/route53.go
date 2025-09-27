@@ -8,8 +8,8 @@ import (
     "strings"
 
     "github.com/aws/aws-sdk-go-v2/aws"
-    "github.com/aws/aws-sdk-go-v2/service/route53/types"
     "github.com/aws/aws-sdk-go-v2/service/route53"
+    "github.com/aws/aws-sdk-go-v2/service/route53/types"
     "github.com/levelshatter/awsum/internal/memory"
 )
 
@@ -94,8 +94,6 @@ func (svc *Route53) GetAssumedHostedZoneByDomainName(ctx context.Context, domain
             domainParts[len(domainParts)-1],
             "",
         }, ".")
-
-        fmt.Println(memory.Unwrap(zone.Name), assumedHostedZoneName)
 
         if memory.Unwrap(zone.Name) == assumedHostedZoneName && memory.Unwrap(zone.Config).PrivateZone == private {
             return &zone, nil
