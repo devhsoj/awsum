@@ -187,6 +187,16 @@ func main() {
                                 Usage:    "the ACM certificate name(s) to attach to the created listener. the first certificate is default.",
                                 OnlyOnce: false,
                             },
+                            &cli.StringSliceFlag{
+                                Name:     "domain",
+                                Usage:    "the FQDN(s) to attach to the desired load balancer.",
+                                OnlyOnce: false,
+                            },
+                            &cli.BoolFlag{
+                                Name:     "private",
+                                Usage:    "if your load balancer and domain records should be private",
+                                OnlyOnce: true,
+                            },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
                             portParts := strings.Split(command.String("port"), ":")
@@ -217,6 +227,8 @@ func main() {
                                 TrafficPort:                  int32(trafficPort),
                                 TrafficProtocol:              types.ProtocolEnum(strings.ToUpper(protocolParts[1])),
                                 CertificateNames:             command.StringSlice("certificate"),
+                                DomainNames:                  command.StringSlice("domain"),
+                                Private:                      command.Bool("private"),
                             })
                         },
                     },

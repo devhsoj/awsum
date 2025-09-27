@@ -124,6 +124,8 @@ type InstanceLoadBalanceOptions struct {
     TrafficPort                  int32
     TrafficProtocol              types.ProtocolEnum
     CertificateNames             []string
+    DomainNames                  []string
+    Private                      bool
 }
 
 func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
@@ -137,6 +139,8 @@ func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
         TrafficPort:                  opts.TrafficPort,
         TrafficProtocol:              opts.TrafficProtocol,
         CertificateNames:             opts.CertificateNames,
+        DomainNames:                  opts.DomainNames,
+        Private:                      opts.Private,
     })
 
     if err != nil {
@@ -144,6 +148,10 @@ func InstanceLoadBalance(opts InstanceLoadBalanceOptions) error {
     }
 
     output := resources.LoadBalancerDNSName
+
+    if len(opts.DomainNames) > 0 {
+        output = opts.DomainNames[0]
+    }
 
     switch opts.LoadBalancerListenerProtocol {
     case types.ProtocolEnumTcp:

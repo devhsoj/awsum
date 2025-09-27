@@ -74,7 +74,7 @@ func (svc *EC2) GetAllRunningInstances(ctx context.Context) ([]*Instance, error)
     return instances, nil
 }
 
-func (svc *EC2) GetAllVPCs(ctx context.Context) ([]types.Vpc, error) {
+func (svc *EC2) GetAllVPCs(ctx context.Context, vpcIds ...string) ([]types.Vpc, error) {
     var (
         vpcs      []types.Vpc
         nextToken *string
@@ -82,6 +82,7 @@ func (svc *EC2) GetAllVPCs(ctx context.Context) ([]types.Vpc, error) {
 
     for {
         output, err := DefaultEC2.Client().DescribeVpcs(ctx, &ec2.DescribeVpcsInput{
+            VpcIds:    vpcIds,
             NextToken: nextToken,
         })
 

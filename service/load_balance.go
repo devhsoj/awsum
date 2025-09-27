@@ -24,16 +24,18 @@ var (
 // AwsumILBService is a struct used to encompass all the logic of services on instances that are load balanced by
 // resources created by awsum.
 type AwsumILBService struct {
-    EC2   *EC2
-    ELBv2 *ELBv2
-    ACM   *ACM
+    EC2     *EC2
+    ELBv2   *ELBv2
+    ACM     *ACM
+    Route53 *Route53
 }
 
 func NewAwsumILBService(awsConfig aws.Config) *AwsumILBService {
     return &AwsumILBService{
-        EC2:   NewEC2(awsConfig),
-        ELBv2: NewELBv2(awsConfig),
-        ACM:   NewACM(awsConfig),
+        EC2:     NewEC2(awsConfig),
+        ELBv2:   NewELBv2(awsConfig),
+        ACM:     NewACM(awsConfig),
+        Route53: NewRoute53(awsConfig),
     }
 }
 
@@ -55,6 +57,8 @@ type SetupNewILBServiceOptions struct {
     TrafficPort                  int32
     TrafficProtocol              types.ProtocolEnum
     CertificateNames             []string
+    DomainNames                  []string
+    Private                      bool
 }
 
 func (opts SetupNewILBServiceOptions) AwsumResourceName() string {
@@ -263,14 +267,20 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
 
         azGroupedSubnets := slices.Collect(maps.Values(subnetAzMap))
 
-        clbOutput, err := svc.ELBv2.Client().CreateLoadBalancer(opts.Ctx, &elbv2.CreateLoadBalancerInput{
+        lbConfig := &elbv2.CreateLoadBalancerInput{
             Name:           memory.Pointer(opts.AwsumResourceName()),
             Type:           types.LoadBalancerTypeEnumApplication,
             Scheme:         types.LoadBalancerSchemeEnumInternetFacing,
             SecurityGroups: []string{resources.SecurityGroupId},
             Subnets:        append(instanceSubnets, azGroupedSubnets...),
             IpAddressType:  types.IpAddressTypeIpv4,
-        })
+        }
+
+        if opts.Private {
+            lbConfig.Scheme = types.LoadBalancerSchemeEnumInternal
+        }
+
+        clbOutput, err := svc.ELBv2.Client().CreateLoadBalancer(opts.Ctx, lbConfig)
 
         if err != nil {
             return nil, err
@@ -320,7 +330,10 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
         _, err = svc.ELBv2.Client().RegisterTargets(opts.Ctx, &elbv2.RegisterTargetsInput{
             TargetGroupArn: memory.Pointer(resources.TargetGroupArn),
             Targets: []types.TargetDescription{
-                {Id: instance.Info.InstanceId, Port: memory.Pointer(opts.TrafficPort)},
+                {
+                    Id:   instance.Info.InstanceId,
+                    Port: memory.Pointer(opts.TrafficPort),
+                },
             },
         })
 
@@ -360,6 +373,23 @@ func (svc *AwsumILBService) SetupNewILBService(opts SetupNewILBServiceOptions) (
 
     if err != nil {
         return nil, err
+    }
+
+    // attach domain(s) to load balancer
+
+    if len(opts.DomainNames) > 0 {
+        err = svc.Route53.AttachDomainsToLoadBalancer(AttachDomainsToLoadBalancerOptions{
+            Ctx:              opts.Ctx,
+            LoadBalancerName: opts.AwsumResourceName(),
+            ELBService:       svc.ELBv2,
+            EC2Service:       svc.EC2,
+            Private:          opts.Private,
+            DomainNames:      opts.DomainNames,
+        })
+
+        if err != nil {
+            return nil, err
+        }
     }
 
     return &resources, err
