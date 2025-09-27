@@ -85,7 +85,7 @@ awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos
 
 "
 load balance an http service running on port 80 on
-instances matching the name "demo" using https with
+instances matching the name 'demo' using https with
 a certificate from ACM and with a domain pointing to it.
 "
 
