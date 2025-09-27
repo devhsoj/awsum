@@ -71,7 +71,7 @@ awsum instance shell --name website "df -h"
 
 Basic app deployment w/ load-balancing (Amazon Linux example):
 
-**Note:** awsum does not modify any non-awsum related resources to prevent breaking existing infrastructure.
+**Note:** awsum does not modify any non-related resources to prevent breaking existing infrastructure.
 **Note 2:** This is actually an exact replica of the demo deployment done by awsum (on two t2.nano instances) [NGINX Demo](https://awsum.levelshatter.com/).
 
 ```shell

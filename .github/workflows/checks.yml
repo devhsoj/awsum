@@ -18,6 +18,15 @@ jobs:
           go-version: '1.25'
       - name: configure
         run: |
+          mkdir -p ~/.aws
+          
+          echo "[default]
+          region = ${{ secrets.AWS_REGION }}" > ~/.aws/config
+          
+          echo "[default]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" > ~/.aws/credentials
+          
           mkdir -p ~/.ssh
           touch ~/.ssh/known_hosts
           
@@ -30,7 +39,6 @@ jobs:
         run: go install
       - name: demo deploy
         run: |
-          awsum configure
           awsum instance shell --name demo "sudo yum install docker -y"
           awsum instance shell --name demo "sudo service docker start"
           awsum instance shell --name demo "sudo usermod -aG docker ec2-user"
