@@ -400,7 +400,7 @@ func (i *Instance) AttachShell(sshUser string) error {
     return nil
 }
 
-func (i *Instance) RunInteractiveCommand(sshUser string, command string) error {
+func (i *Instance) RunCommand(sshUser string, command string, interactive bool, quiet bool) error {
     client, err := i.DialSSH(sshUser)
 
     if err != nil {
@@ -425,11 +425,25 @@ func (i *Instance) RunInteractiveCommand(sshUser string, command string) error {
         }
     }()
 
-    session.Stdout = os.Stdout
-    session.Stderr = os.Stderr
-    session.Stdin = os.Stdin
+    if interactive {
+        if !quiet {
+            session.Stdout = os.Stdout
+            session.Stderr = os.Stderr
+            session.Stdin = os.Stdin
+        }
 
-    if err = session.Run(command); err != nil {
+        err = session.Run(command)
+    } else {
+        if !quiet {
+            output, err := session.CombinedOutput(command)
+
+            if _, err = os.Stdout.Write(output); err != nil {
+                return fmt.Errorf("failed to write combined command output to stdout: %w", err)
+            }
+        }
+    }
+
+    if err != nil {
         return fmt.Errorf("failed to run command on instance: %w", err)
     }
 

@@ -3,8 +3,10 @@ package commands
 import (
     "context"
     "encoding/csv"
+    "errors"
     "fmt"
     "os"
+    "sync"
 
     "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
     "github.com/levelshatter/awsum/internal/memory"
@@ -80,6 +82,7 @@ type InstanceShellOptions struct {
     User            string
     Command         string
     Quiet           bool
+    Parallel        bool
 }
 
 func InstanceShell(opts InstanceShellOptions) error {
@@ -88,6 +91,12 @@ func InstanceShell(opts InstanceShellOptions) error {
     if err != nil {
         return err
     }
+
+    var (
+        wg   sync.WaitGroup
+        errs []error
+        mu   sync.Mutex
+    )
 
     for _, instance := range opts.InstanceFilters.Matches(instances) {
         if len(opts.Command) == 0 {
@@ -98,20 +107,32 @@ func InstanceShell(opts InstanceShellOptions) error {
             continue
         }
 
-        if !opts.Quiet {
-            fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
-        }
+        if !opts.Parallel {
+            if !opts.Quiet {
+                fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
+            }
 
-        if err = instance.RunInteractiveCommand(opts.User, opts.Command); err != nil {
-            return err
-        }
+            if err = instance.RunCommand(opts.User, opts.Command, !opts.Parallel, opts.Quiet); err != nil {
+                return err
+            }
 
-        if !opts.Quiet {
-            fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+            if !opts.Quiet {
+                fmt.Printf("--- '%s' SHELL END ---\n", instance.GetName())
+            }
+        } else {
+            wg.Go(func() {
+                if err = instance.RunCommand(opts.User, opts.Command, !opts.Parallel, opts.Quiet); err != nil {
+                    mu.Lock()
+                    errs = append(errs, err)
+                    mu.Unlock()
+                }
+            })
         }
     }
 
-    return nil
+    wg.Wait()
+
+    return errors.Join(errs...)
 }
 
 type InstanceLoadBalanceOptions struct {

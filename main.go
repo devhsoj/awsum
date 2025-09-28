@@ -93,6 +93,7 @@ func main() {
                             },
                             &cli.StringFlag{
                                 Name:     "name",
+                                Aliases:  []string{"n"},
                                 Usage:    "a fuzzy filter that matches against ec2 instance names (from tags)",
                                 OnlyOnce: true,
                             },
@@ -103,6 +104,13 @@ func main() {
                                 Value:    false,
                                 OnlyOnce: true,
                             },
+                            &cli.BoolFlag{
+                                Name:     "parallel",
+                                Aliases:  []string{"p"},
+                                Usage:    "whether to run the commands in parallel across instances. note: parallel output has no debug information.",
+                                Value:    false,
+                                OnlyOnce: true,
+                            },
                         },
                         Action: func(ctx context.Context, command *cli.Command) error {
                             return commands.InstanceShell(commands.InstanceShellOptions{
@@ -110,9 +118,10 @@ func main() {
                                 InstanceFilters: service.InstanceFilters{
                                     Name: command.String("name"),
                                 },
-                                User:    command.String("user"),
-                                Command: strings.Join(command.Args().Slice(), " "),
-                                Quiet:   command.Bool("quiet"),
+                                User:     command.String("user"),
+                                Command:  strings.Join(command.Args().Slice(), " "),
+                                Quiet:    command.Bool("quiet"),
+                                Parallel: command.Bool("parallel"),
                             })
                         },
                     },
