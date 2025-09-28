@@ -112,7 +112,7 @@ func InstanceShell(opts InstanceShellOptions) error {
                 fmt.Printf("--- '%s' SHELL START ---\n", instance.GetName())
             }
 
-            if err = instance.RunCommand(opts.User, opts.Command, !opts.Parallel, opts.Quiet); err != nil {
+            if err = instance.RunCommand(opts.User, opts.Command, opts.Quiet); err != nil {
                 return err
             }
 
@@ -121,7 +121,7 @@ func InstanceShell(opts InstanceShellOptions) error {
             }
         } else {
             wg.Go(func() {
-                if err = instance.RunCommand(opts.User, opts.Command, !opts.Parallel, opts.Quiet); err != nil {
+                if err = instance.RunCommand(opts.User, opts.Command, opts.Quiet); err != nil {
                     mu.Lock()
                     errs = append(errs, err)
                     mu.Unlock()
