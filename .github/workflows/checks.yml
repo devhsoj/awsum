@@ -39,9 +39,7 @@ jobs:
         run: go install
       - name: demo deploy
         run: |
-          BASE_COMMAND="awsum instance shell --name \"awsum-demo\""
-          
-          $BASE_COMMAND -p "echo \"
+          awsum instance shell --name "awsum-demo" -p "echo \"
           services:
             traefik:
               image: traefik:v3.1
@@ -72,9 +70,9 @@ jobs:
               driver: bridge
             \" > docker.compose.yml
             "
-          
-            $BASE_COMMAND -p "docker compose -f docker.compose.yml down"
-            $BASE_COMMAND -p "docker compose -f docker.compose.yml up -d --scale app=4"
+            
+            awsum instance shell --name "awsum-demo" -p "docker compose -f docker.compose.yml down"
+            awsum instance shell --name "awsum-demo" -p "docker compose -f docker.compose.yml up -d --scale app=4"
             
             awsum instance load-balance \
               --service "awsum-demo" \

@@ -66,48 +66,68 @@ Basic app deployment:
 **Note 2:** When using awsum in your CI/CD platforms, please remember to properly secure access to awsum, access to your instances, and the users awsum will authenticate as. You do not want to give fully privileged RCE to anyone making code changes...
 
 ```shell
-BASE_COMMAND="awsum instance shell --name \"awsum-demo\""
+#!/bin/bash
 
-$BASE_COMMAND -p "echo \"
+awsum instance shell --name "awsum-demo" -p "
+if [[ -e /usr/bin/docker ]]; then
+	exit	
+else
+	sudo yum update -y
+	sudo yum install docker -y
+	sudo usermod -aG docker ec2-user
+fi
+"
+
+awsum instance shell --name "awsum-demo" -p "
+if [[ -d /usr/libexec/docker/cli-plugins ]]; then
+	exit
+fi
+
+sudo mkdir -p /usr/libexec/docker/cli-plugins
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+"
+
+awsum instance shell --name "awsum-demo" -p "echo \"
 services:
-traefik:
-  image: traefik:v3.1
-  command:
-    - --providers.docker=true
-    - --entrypoints.web.address=:80
-    - --serversTransport.insecureSkipVerify=false
-  ports:
-    - \\\"80:80\\\"
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-  networks:
-    - web
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --serversTransport.insecureSkipVerify=false
+    ports:
+      - '80:80'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - web
 
-app:
-  image: traefik/whoami
-  labels:
-    - \\\"traefik.enable=true\\\"
-    - \\\"traefik.http.routers.app.entrypoints=web\\\"
-    - \\\"traefik.http.routers.app.service=app\\\"
-    - \\\"traefik.http.routers.app.rule=PathPrefix(\\\`/\\\`)\\\"
-    - \\\"traefik.http.services.app.loadbalancer.server.port=80\\\"
-  networks:
-    - web
+  app:
+    image: traefik/whoami
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.app.entrypoints=web'
+      - 'traefik.http.routers.app.service=app'
+      - 'traefik.http.routers.app.rule=PathPrefix(\\\`/\\\`)'
+      - 'traefik.http.services.app.loadbalancer.server.port=80'
+    networks:
+      - web
 
 networks:
-web:
-  driver: bridge
+  web:
+    driver: bridge
 \" > docker.compose.yml
 "
 
-$BASE_COMMAND -p "docker compose -f docker.compose.yml down"
-$BASE_COMMAND -p "docker compose -f docker.compose.yml up -d --scale app=4"
+awsum instance shell --name "awsum-demo" -p "docker compose -f docker.compose.yml down"
+awsum instance shell --name "awsum-demo" -p "docker compose -f docker.compose.yml up -d --scale app=4"
 
 awsum instance load-balance \
-  --service "awsum-demo" \
-  --name "awsum-demo" \
-  --port 443:80 \
-  --protocol https:http \
-  --certificate "levelshatter.com" \
-  --domain "awsum.levelshatter.com"
+    --service "awsum-demo" \
+    --name "awsum-demo" \
+    --port 443:80 \
+    --protocol https:http \
+    --certificate "levelshatter.com" \
+    --domain "awsum.levelshatter.com"
 ```
