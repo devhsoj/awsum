@@ -59,29 +59,55 @@ Get the free disk space of every ec2 instance with a name containing "website" o
 awsum instance shell --name website "df -h"
 ```
 
-Basic app deployment w/ automatic load-balancing, dns, and certificate management:
+Basic app deployment:
 
 **Note:** This is actually an exact replica of the demo deployment done by the awsum GitHub Action workflow (across two t2.nano instances) [NGINX Demo](https://awsum.levelshatter.com/).
 
-**Note 2:** When using awsum in CI/CD platforms, please remember to properly secure access to awsum, access to your instances, and the users awsum will authenticate as. You do not want to give fully privileged RCE to anyone making code changes...
+**Note 2:** When using awsum in your CI/CD platforms, please remember to properly secure access to awsum, access to your instances, and the users awsum will authenticate as. You do not want to give fully privileged RCE to anyone making code changes...
 
 ```shell
-# basic deployment logic
+BASE_COMMAND="awsum instance shell --name \"awsum-demo\""
 
-awsum instance shell --name demo "docker rm nginx --force"
-awsum instance shell --name demo "docker run -d -p 80:80 --name nginx nginxdemos/hello"
+$BASE_COMMAND -p "echo \"
+services:
+traefik:
+  image: traefik:v3.1
+  command:
+    - --providers.docker=true
+    - --entrypoints.web.address=:80
+    - --serversTransport.insecureSkipVerify=false
+  ports:
+    - \\\"80:80\\\"
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+  networks:
+    - web
 
+app:
+  image: traefik/whoami
+  labels:
+    - \\\"traefik.enable=true\\\"
+    - \\\"traefik.http.routers.app.entrypoints=web\\\"
+    - \\\"traefik.http.routers.app.service=app\\\"
+    - \\\"traefik.http.routers.app.rule=PathPrefix(\\\`/\\\`)\\\"
+    - \\\"traefik.http.services.app.loadbalancer.server.port=80\\\"
+  networks:
+    - web
+
+networks:
+web:
+  driver: bridge
+\" > docker.compose.yml
 "
-load balance an http service running on port 80 on
-instances matching the name 'demo' using https with
-a certificate from ACM and with a domain pointing to it.
-"
+
+$BASE_COMMAND -p "docker compose -f docker.compose.yml down"
+$BASE_COMMAND -p "docker compose -f docker.compose.yml up -d --scale app=4"
 
 awsum instance load-balance \
-    --service "nginx-demo" \
-    --name demo \
-    --port 443:80 \
-    --protocol https:http \
-    --certificate "levelshatter.com" \
-    --domain "awsum.levelshatter.com"
+  --service "awsum-demo" \
+  --name "awsum-demo" \
+  --port 443:80 \
+  --protocol https:http \
+  --certificate "levelshatter.com" \
+  --domain "awsum.levelshatter.com"
 ```
