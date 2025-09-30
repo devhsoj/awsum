@@ -400,7 +400,7 @@ func (i *Instance) AttachShell(sshUser string) error {
     return nil
 }
 
-func (i *Instance) RunCommand(sshUser string, command string, quiet bool) error {
+func (i *Instance) RunInteractiveCommand(sshUser string, command string, quiet bool) error {
     client, err := i.DialSSH(sshUser)
 
     if err != nil {

@@ -1,6 +1,6 @@
 # awsum
 
-a fun CLI tool for working with AWS infra (cross-platform)
+a cross-platform CLI tool for rapid debugging & development with AWS infrastructure
 
 ## Installation
 *Required:* [Go 1.25](https://go.dev/dl)
@@ -42,14 +42,9 @@ All AWS operations triggered by AWS service clients created by awsum are logged 
 * `~/.aws/awsum/awsum-global-aws-log-output` for a record of all operations done by executions of awsum.
 * `~/.aws/awsum/awsum-session-aws-log-output-YYYY-MM-DD__HH-mm-SS` for operations grouped by individual executions of awsum.
 
-To get a description of awsum and how to use its commands and sub-commands:
+To get help with awsum and its commands and sub-commands just use the `--help` flag, here is an example:
 ```shell
-awsum --help
-```
-
-**(Example)** To get help with commands and sub-commands:
-```shell
-awsum instance --help
+awsum instance load-balance --help
 ```
 
 ### Real-World Examples
@@ -59,23 +54,16 @@ Get a list of all instances in csv:
 awsum instance list --format csv
 ```
 
-Sequentially open a secure shell (SSH) to every instance with a name matching "worker":
-```shell
-awsum instance shell --name "worker"
-```
-
-Get the free disk space of every ec2 instance with a name matching "website" over SSH:
+Get the free disk space of every ec2 instance with a name containing "website" over SSH:
 ```shell
 awsum instance shell --name website "df -h"
 ```
 
-Basic app deployment w/ load-balancing (Amazon Linux example):
+Basic app deployment w/ automatic load-balancing, dns, and certificate management:
 
-**Note:** awsum does not modify any non-command-related resources to prevent breaking existing infrastructure.
+**Note:** This is actually an exact replica of the demo deployment done by the awsum GitHub Action workflow (across two t2.nano instances) [NGINX Demo](https://awsum.levelshatter.com/).
 
-**Note 2:** This is actually an exact replica of the demo deployment done by awsum (on two t2.nano instances) [NGINX Demo](https://awsum.levelshatter.com/).
-
-**Note 3:** Please, please, please, properly secure your CI/CD platforms, your instances, and lock down the users awsum will authenticate as, you do not want to give fully privileged RCE to anyone/and or service making code changes...
+**Note 2:** When using awsum in CI/CD platforms, please remember to properly secure access to awsum, access to your instances, and the users awsum will authenticate as. You do not want to give fully privileged RCE to anyone making code changes...
 
 ```shell
 # basic deployment logic
@@ -97,5 +85,3 @@ awsum instance load-balance \
     --certificate "levelshatter.com" \
     --domain "awsum.levelshatter.com"
 ```
-
-awsum really shines when used in CI/CD processes.
