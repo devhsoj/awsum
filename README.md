@@ -66,28 +66,6 @@ Basic app deployment:
 **Note 2:** When using awsum in your CI/CD platforms, please remember to properly secure access to awsum, access to your instances, and the users awsum will authenticate as. You do not want to give fully privileged RCE to anyone making code changes...
 
 ```shell
-#!/bin/bash
-
-awsum instance shell --name "awsum-demo" -p "
-if [[ -e /usr/bin/docker ]]; then
-	exit	
-else
-	sudo yum update -y
-	sudo yum install docker -y
-	sudo usermod -aG docker ec2-user
-fi
-"
-
-awsum instance shell --name "awsum-demo" -p "
-if [[ -d /usr/libexec/docker/cli-plugins ]]; then
-	exit
-fi
-
-sudo mkdir -p /usr/libexec/docker/cli-plugins
-sudo curl -SL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
-sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
-"
-
 awsum instance shell --name "awsum-demo" -p "echo \"
 services:
   traefik:
