@@ -80,4 +80,4 @@ jobs:
               --port 443:80 \
               --protocol https:http \
               --certificate "levelshatter.com" \
-              --domain "awsum.levelshatter.com"
+              --domain "awsumdemo.levelshatter.com"
